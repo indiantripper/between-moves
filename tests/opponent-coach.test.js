@@ -50,3 +50,9 @@ test('explains Sicilian and Caro–Kann pawn moves as central control rather tha
   const sicilian=ideaFor(['e4','c5']);assert.match(sicilian.reason,/controlling d4/);assert.match(sicilian.plan,/centre/);
   const caro=ideaFor(['e4','c6']);assert.match(caro.reason,/controlling d5/);
 });
+test('explains Be7 as clearing the castling path only while castling rights remain',()=>{
+  const idea=ideaFor(['e4','e5','Nf3','Nc6','c3','Nf6','d4','exd4','e5','Ne4','cxd4','Be7']);
+  assert.match(idea.reason,/clears the path for kingside castling/);
+  const noRights=explainOpponentMove({before:'4kb1r/8/8/8/8/8/8/4K3 b - - 0 1',uci:'f8e7'});
+  assert.doesNotMatch(noRights.reason,/castling/);
+});

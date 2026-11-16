@@ -72,6 +72,11 @@ export function explainOpponentMove({before,uci,previousMove=null,analysis=null,
   }else if('nb'.includes(move.piece)&&move.from[1]===(move.color==='w'?'1':'8')){
     reason=`${side} brings the ${piece} out from its starting square to ${move.to}${threats[0]?`, attacking ${targetName(threats[0])}`:''}.`;
     plan='Get pieces into play and increase influence over the centre.';
+    const rank=move.color==='w'?'1':'8',right=move.color==='w'?'K':'k';
+    if(['f'+rank,'g'+rank].includes(move.from)&&after.fen().split(' ')[2].includes(right)&&after.get('e'+rank)?.type==='k'&&after.get('h'+rank)?.type==='r'&&!after.get('f'+rank)&&!after.get('g'+rank)){
+      reason+=' This also clears the path for kingside castling.';
+      plan='Prepare to castle on the kingside and bring the rook into play.';
+    }
   }else{
     const defended=after.board().flat().filter(p=>p&&p.color===move.color&&p.type!=='k'&&p.square!==move.to&&after.attackers(p.square,move.color).includes(move.to)&&!prior.attackers(p.square,move.color).includes(move.from)).sort((a,b)=>Number(prior.isAttacked(b.square,enemy))-Number(prior.isAttacked(a.square,enemy))||VALUE[b.type]-VALUE[a.type]);
     const fianchetto=move.piece==='p'&&((move.color==='b'&&['g6','b6'].includes(move.to))||(move.color==='w'&&['g3','b3'].includes(move.to)));
