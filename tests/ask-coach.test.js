@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Chess } from 'chess.js';
-import { coachSuggestion,usedCoachHelp,previewSuggestion } from '../src/ask-coach.js';
+import { coachSuggestion,usedCoachHelp,previewSuggestion,previewLesson } from '../src/ask-coach.js';
 import { learningSummary } from '../src/coach.js';
 test('a suggestion explains the legal move and verified central pawn attack',()=>{
   const g=new Chess();g.move('e4');g.move('e5');
@@ -58,4 +58,36 @@ test('Black previews, castling, en passant, promotion and short terminal lines s
   const mate=new Chess();['f3','e5','g4'].forEach(m=>mate.move(m));
   const finish=coachSuggestion(mate.fen(),{pv:['d8h4','e1e2']});
   assert.equal(finish.pv.length,1);assert.equal(new Chess(previewSuggestion(finish,2).fen).isCheckmate(),true);
+});
+
+test('each preview lesson follows its exact move and restores the same explanation on rewind',()=>{
+  const g=new Chess();g.move('e4');g.move('e5');
+  const suggestion=coachSuggestion(g.fen(),{pv:['g1f3','b8c6','f1b5','a7a6','b5c6','d7c6']});
+  const snapshot=structuredClone(suggestion),first=previewLesson(suggestion,1),reply=previewLesson(suggestion,2);
+  assert.equal(first.actor,'you');assert.match(first.heading,/Your move.*White Nf3/);assert.match(first.reason,/pawn on e5/);
+  assert.equal(reply.actor,'opponent');assert.match(reply.heading,/Black Nc6/);assert.match(reply.reason,/knight.*c6/);assert.ok(reply.plan);assert.ok(reply.watch);
+  assert.match(reply.next,/White: Bb5/);
+  const recapture=previewLesson(suggestion,6);assert.match(recapture.reason,/recaptures on c6.*bishop/);
+  assert.equal(recapture.next,'');assert.deepEqual(previewLesson(suggestion,2),reply);assert.deepEqual(suggestion,snapshot);
+  assert.equal(previewLesson(suggestion,0).actor,'start');assert.equal(previewLesson(null,1),null);
+});
+test('opponent pins and checks explain the threat from the player’s perspective',()=>{
+  const g=new Chess();['d4','Nf6','c4','e6'].forEach(m=>g.move(m));
+  const pin=coachSuggestion(g.fen(),{pv:['b1c3','f8b4','g1f3']});
+  const lesson=previewLesson(pin,2);assert.match(lesson.reason,/knight on c3.*king behind/);assert.match(lesson.watch,/expose your king/);
+  const checks=new Chess();['e4','e5','Nf3','Nc6'].forEach(m=>checks.move(m));
+  const line=coachSuggestion(checks.fen(),{pv:['d2d4','f8b4']});
+  assert.match(previewLesson(line,1).watch,/Bb4.*gives check/);
+  assert.match(previewLesson(line,2).watch,/Your king is in check/);
+});
+test('Black players get White opponent lessons, captures are conditional, and mate ends the warning',()=>{
+  const g=new Chess();g.move('e4');
+  const black=coachSuggestion(g.fen(),{pv:['e7e5','g1f3']});
+  const whiteReply=previewLesson(black,2);assert.equal(whiteReply.actor,'opponent');assert.match(whiteReply.heading,/White Nf3/);assert.match(whiteReply.reason,/your pawn on e5/);
+  const exchange=coachSuggestion(new Chess().fen(),{pv:['e2e4','d7d5','e4d5','d8d5']});
+  assert.match(previewLesson(exchange,3).watch,/Qxd5.*capturing your pawn/);
+  assert.match(previewLesson(exchange,4).reason,/recaptures/);
+  const mate=new Chess();['f3','e5','g4'].forEach(m=>mate.move(m));
+  const finish=coachSuggestion(mate.fen(),{pv:['d8h4']});
+  const lesson=previewLesson(finish,1);assert.match(lesson.watch,/delivered checkmate/);assert.equal(lesson.next,'');
 });

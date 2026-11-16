@@ -11,7 +11,7 @@ import './interaction.css';
 import './readability.css';
 import './whatif.css';
 import './mobile-coach.css';
-import { coachSuggestion, usedCoachHelp, previewSuggestion } from './ask-coach.js';
+import { coachSuggestion, usedCoachHelp, previewSuggestion, previewLesson } from './ask-coach.js';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -181,7 +181,9 @@ function openMobileTools() {
 function coachHelpMarkup() {
   if(!coachHelp)return '';
   const h=coachHelp;
-  let text=h.stage==='loading'?'<h3>Finding a useful move…</h3><p>Analysing the position on your board.</p>':h.stage==='error'?`<h3>Couldn’t analyse this position</h3><p>${esc(h.error)}</p><button class="button secondary" id="coach-retry-help">Try again</button>`:h.stage==='hint'?`<h3>A hint first</h3><p>${esc(h.suggestion.hint)}</p><button class="button primary" id="coach-show-move">Show move + idea</button>`:`<h3>${preview?.coach?'Preview':'Consider'} ${esc(h.suggestion.san)}</h3><div class="coach-preview-actions"><button class="button secondary" id="coach-preview-move">Preview move</button>${h.suggestion.pv.length>1?'<button class="button secondary" id="coach-preview-reply">Preview reply</button>':''}<button class="button primary" id="coach-play-move" ${canPlayCoachMove()?'':'disabled'}>Play this move</button></div>${coachPreviewCaption()}<p>Move your ${esc(h.suggestion.piece)} from ${h.suggestion.from} to ${h.suggestion.to}.</p><p>${esc(h.suggestion.idea)}</p><p class="eyebrow">ONE ENGINE CONTINUATION</p><p class="help-line">${esc(h.suggestion.line.join('  '))}</p><small>Depth ${h.depth} · Stockfish 19 Lite. This is one possible line; your opponent can choose another reply.</small>`;
+  const lesson=preview?.coach?previewLesson(h.suggestion,preview.step,playerLevel()):null;
+  const original=h.suggestion?`<p>Move your ${esc(h.suggestion.piece)} from ${h.suggestion.from} to ${h.suggestion.to}.</p><p>${esc(h.suggestion.idea)}</p><p class="eyebrow">ONE ENGINE CONTINUATION</p><p class="help-line">${esc(h.suggestion.line.join('  '))}</p>`:'';
+  let text=h.stage==='loading'?'<h3>Finding a useful move…</h3><p>Analysing the position on your board.</p>':h.stage==='error'?`<h3>Couldn’t analyse this position</h3><p>${esc(h.error)}</p><button class="button secondary" id="coach-retry-help">Try again</button>`:h.stage==='hint'?`<h3>A hint first</h3><p>${esc(h.suggestion.hint)}</p><button class="button primary" id="coach-show-move">Show move + idea</button>`:`<h3>${esc(lesson?.heading || 'Consider '+h.suggestion.san)}</h3>${lesson?`<div class="coach-step-lesson" data-step="${lesson.step}"><span class="eyebrow">MOVE ${lesson.step} OF ${lesson.total}</span><p><strong>Idea:</strong> ${esc(lesson.reason)}</p>${lesson.actor==='opponent'?`<p><strong>Possible plan:</strong> ${esc(lesson.plan)}</p>`:''}<p class="coach-step-watch"><strong>Watch:</strong> ${esc(lesson.watch)}</p>${lesson.next?`<p class="coach-step-next"><strong>Next in this line:</strong> ${esc(lesson.next)}</p>`:''}</div>`:''}<div class="coach-preview-actions"><button class="button secondary" id="coach-preview-move">Preview move</button>${h.suggestion.pv.length>1?'<button class="button secondary" id="coach-preview-reply">Preview reply</button>':''}<button class="button primary" id="coach-play-move" ${canPlayCoachMove()?'':'disabled'}>${lesson?'Play '+esc(h.suggestion.san):'Play this move'}</button></div>${lesson?`<details class="coach-original-idea"><summary>Original suggestion & full line</summary>${original}</details>`:original}<small>Depth ${h.depth} · Stockfish 19 Lite. One possible line; the opponent can choose another reply.</small>`;
   return `<section class="coach-help" aria-live="polite"><span class="eyebrow">ASK COACH · ${preview?.coach?'BOARD PREVIEW':preview?'DISPLAYED POSITION':'YOUR CURRENT POSITION'}</span>${text}<button class="button subtle" id="coach-dismiss">Dismiss</button><p class="analysis-note">Help marks this decision as assisted, including when coaching is off.</p></section>`;
 }
 async function askCoach() {
@@ -203,12 +205,6 @@ async function askCoach() {
 function revealCoachMove() {
   if(!coachHelp?.suggestion || coachHelp.fen!==shownGame().fen())return;
   coachHelp.stage='answer';arrow=uciMove(coachHelp.suggestion.uci);selected=null;render();
-}
-function coachPreviewCaption() {
-  if(!preview?.coach)return '';
-  const step=preview.step,line=coachHelp.suggestion.line;
-  const caption=step===0?'Your position before the suggestion.':step===1?`Your suggested move: ${line[0]}.`:step===2?`Opponent’s engine reply: ${line[1]}.`:`${step%2?'Your':'Opponent’s'} continuation: ${line[step-1]}.`;
-  return `<p class="coach-preview-caption" role="status">${esc(caption)} Use ← / → below the board to explore. This preview does not play any moves.</p>`;
 }
 function previewCoachMove(step=1) {
   if(busy || !coachHelp?.suggestion || coachHelp.gameId!==current?.id)return;

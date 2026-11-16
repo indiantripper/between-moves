@@ -79,3 +79,7 @@
   .preview-bar.coach-line #exit-preview{font-size:0}
   .preview-bar.coach-line #exit-preview::after{content:'Return';font-size:12px}
 }
+.coach-step-lesson{margin:8px 0 12px}.coach-step-lesson p{margin:9px 0;line-height:1.6}
+.coach-step-lesson .coach-step-watch{padding:10px;border-left:3px solid #b18c4f;background:#f5eedf;border-radius:0 5px 5px 0;color:#654e2e}
+.coach-step-lesson .coach-step-next{font-size:14px;color:#56694f}
+.coach-original-idea{margin:12px 0}.coach-original-idea summary{min-height:44px;padding:10px 0;font-size:14px;color:#415f38;cursor:pointer}.coach-original-idea[open] summary{margin-bottom:8px}

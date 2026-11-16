@@ -1,4 +1,5 @@
 import { Chess } from 'chess.js';
+import { explainOpponentMove } from './opponent-coach.js';
 import { PIECE_NAMES, uciMove, explainCandidate, sanLine } from './coach.js';
 
 // Every concrete claim comes from the legal move or its supplied engine line.
@@ -26,4 +27,34 @@ export function previewSuggestion(suggestion,step=1) {
   let last=null;
   try{for(const uci of suggestion.pv.slice(0,count))last=position.move(uciMove(uci));}catch{return null;}
   return {fen:position.fen(),step:count,last,next:suggestion.pv[count]||null};
+}
+
+export function previewLesson(suggestion,step,level=1350) {
+  const result=previewSuggestion(suggestion,step);if(!result)return null;
+  const count=result.step,position=new Chess(result.fen),user=new Chess(suggestion.fen).turn();
+  if(count===0)return {step:0,total:suggestion.pv.length,actor:'start',heading:'Your starting position',reason:suggestion.hint,plan:'Step forward to see the suggested move and how the opponent could respond.',watch:position.isCheck()?'Your king is in check. Your move must answer the check.':'Before deciding, compare the opponent’s checks, captures and direct threats.',next:suggestion.line[0]||''};
+  const before=new Chess(suggestion.fen);let previousMove=null;
+  for(const uci of suggestion.pv.slice(0,count-1))previousMove=before.move(uciMove(uci));
+  const move=result.last,own=move.color===user,side=move.color==='w'?'White':'Black';
+  const opponent=own?null:explainOpponentMove({before:before.fen(),uci:move.lan,previousMove,level});
+  const ownIdea=own?coachSuggestion(before.fen(),{pv:suggestion.pv.slice(count-1)},level):null;
+  let reason=own?ownIdea.idea:opponent.reason;
+  if(!own && move.captured && !/captures|recaptures/.test(reason)){
+    const recapture=previousMove?.captured && previousMove.to===move.to;
+    reason=`${side} ${recapture?'recaptures':'captures'} on ${move.to}, taking your ${PIECE_NAMES[move.captured]}. ${reason}`;
+  }
+  let watch=opponent?.watch||'',next='';
+  if(result.next){
+    const reply=position.move(uciMove(result.next)),replySide=reply.color==='w'?'White':'Black';
+    next=`${replySide}: ${reply.san}. ${reply.captured?`The ${PIECE_NAMES[reply.piece]} captures ${own?'your':'the opponent’s'} ${PIECE_NAMES[reply.captured]} on ${reply.to}.`:reply.flags.includes('k')||reply.flags.includes('q')?'The king and rook castle.':`The ${PIECE_NAMES[reply.piece]} moves from ${reply.from} to ${reply.to}.`}`;
+    if(own && reply.san.includes('#'))watch=`Watch for ${reply.san}: in this line, your opponent gives checkmate.`;
+    else if(own && reply.san.includes('+'))watch=`Your opponent’s ${reply.san} gives check. You would have to answer that check.`;
+    else if(own && reply.captured)watch=`Your opponent can reply ${reply.san}, capturing your ${PIECE_NAMES[reply.captured]} on ${reply.to}. Check the continuation for a recapture before judging the exchange.`;
+  }
+  const after=new Chess(result.fen);
+  if(after.isCheckmate())watch=own?'You have delivered checkmate; this line is finished.':'Your king has no legal escape from check; this line ends in checkmate.';
+  else if(after.isDraw())watch=after.isStalemate()?'This position is stalemate, so the line ends in a draw.':'This preview position is drawn; there is no move to continue here.';
+  else if(after.isCheck())watch=own?'Your move gives check. The opponent must answer it before carrying out another plan.':'Your king is in check. Your next move must capture the checker, block the check or move the king legally.';
+  if(!watch)watch=own?'Check the opponent’s forcing replies—checks, captures and direct threats—before assuming your idea will work.':'Look for your own checks and captures, and check which pieces the reply attacks before choosing your response.';
+  return {step:count,total:suggestion.pv.length,actor:own?'you':'opponent',heading:`${own?'Your move':'Opponent’s reply'} · ${side} ${move.san}`,reason,plan:own?'Compare the next reply to see how this idea holds up.':opponent.plan,watch,next};
 }
