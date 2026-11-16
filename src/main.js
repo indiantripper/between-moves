@@ -26,7 +26,7 @@ let tab = 'coach', generation = 0, flipped = false, toastTimer, saveQueue = Prom
 let dragState=null, suppressClickUntil=0;
 let mobileDestination='board';
 let renderedPanelKey=null;
-let coachHelp=null, mobileCoachView='coach';
+let coachHelp=null, mobileCoachView='coach', mobilePreviewExpanded=false;
 const engine = new Engine(`${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`);
 let meterEngine=null;
 const positionAnalysis=new LatestPositionAnalysis(async fen=>{
@@ -191,13 +191,42 @@ function paintMobilePreview() {
   const lesson=suggestion?previewLesson(suggestion,preview.step,playerLevel()):null;
   const card=$('#mobile-preview-coach');card.hidden=!lesson;
   $('.play-area').classList.toggle('coach-preview-active',!!lesson);
-  if(!lesson){card.innerHTML='';return;}
-  card.innerHTML=`<div class="mobile-preview-heading"><span class="eyebrow">PREVIEW · ${lesson.step}/${lesson.total}</span><h3>${esc(lesson.heading)}</h3></div><p class="mobile-preview-idea"><strong>Idea:</strong> ${esc(lesson.reason)}</p><p class="mobile-preview-watch"><strong>Watch:</strong> ${esc(lesson.watch)}</p><div class="mobile-preview-controls"><button class="icon-button" id="mobile-preview-back" aria-label="Previous preview move" ${lesson.step===0?'disabled':''}>←</button><button class="icon-button" id="mobile-preview-next" aria-label="Next preview move" ${lesson.step>=lesson.total?'disabled':''}>→</button><button class="button subtle" id="mobile-preview-return">Return to game</button><button class="button subtle" id="mobile-preview-details">${preview.coach?'Full explanation':'Full line details'} ↓</button></div>`;
+  if(!lesson){mobilePreviewExpanded=false;card.classList.remove('is-expanded');card.innerHTML='';return;}
+  card.classList.toggle('is-expanded',mobilePreviewExpanded);
+  card.innerHTML=`
+    <div class="mobile-preview-heading">
+      <span class="eyebrow">PREVIEW · ${lesson.step}/${lesson.total}</span>
+      <h3>${esc(lesson.heading)}</h3>
+    </div>
+    <div class="mobile-preview-controls">
+      <button class="icon-button" id="mobile-preview-back" aria-label="Previous preview move" ${lesson.step===0?'disabled':''}>←</button>
+      <button class="icon-button" id="mobile-preview-next" aria-label="Next preview move" ${lesson.step>=lesson.total?'disabled':''}>→</button>
+      <button class="button subtle" id="mobile-preview-return">Return to game</button>
+    </div>
+    <button class="button subtle" id="mobile-preview-details" aria-controls="mobile-preview-text" aria-expanded="${mobilePreviewExpanded}">${mobilePreviewExpanded?'Show less ↑':'Expand explanation ↓'}</button>
+    <div id="mobile-preview-text">
+      <p class="mobile-preview-idea"><strong>Idea:</strong> ${esc(lesson.reason)}</p>
+      <p class="mobile-preview-watch"><strong>Watch:</strong> ${esc(lesson.watch)}</p>
+      <div id="mobile-preview-extra" ${mobilePreviewExpanded?'':'hidden'}>
+        ${lesson.actor==='opponent'?`<p><strong>Possible plan:</strong> ${esc(lesson.plan)}</p>`:''}
+        ${lesson.next?`<p><strong>Next in this line:</strong> ${esc(lesson.next)}</p>`:''}
+        <p class="mobile-preview-note">This is one engine continuation. Your opponent may choose another reply.</p>
+      </div>
+    </div>
+`;
+
 }
-function showPreviewDetails() {
+function togglePreviewExplanation() {
   if(!preview?.line)return;
-  tab='coach';mobileCoachView=preview.coach?'coach':'five';render();
-  (preview.coach?$('.coach-help'):$('.variation-card'))?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
+  const card=$('#mobile-preview-coach'),button=$('#mobile-preview-details');
+  const top=window.scrollY,left=window.scrollX;
+  mobilePreviewExpanded=!mobilePreviewExpanded;
+  card.classList.toggle('is-expanded',mobilePreviewExpanded);
+  $('#mobile-preview-extra').hidden=!mobilePreviewExpanded;
+  button.setAttribute('aria-expanded',String(mobilePreviewExpanded));
+  button.textContent=mobilePreviewExpanded?'Show less ↑':'Expand explanation ↓';
+  // Expanding grows the same page; keep the board and current reading position steady.
+  window.scrollTo({top,left,behavior:'instant'});
 }
 function canAskCoach() {
   return !!current && engineReady && !busy && coachHelp?.stage!=='loading' && !preview?.line && !preview?.opponentEdit && shownGame().turn()===current.color && !shownGame().isGameOver();
@@ -636,7 +665,7 @@ document.addEventListener('click',e=>{
   if(b.dataset.candidate!=null){showCandidate(Number(b.dataset.candidate));return;}
   if(b.dataset.history!=null){viewHistory(Number(b.dataset.history));return;} if(b.dataset.game){openRecord(b.dataset.game);return;}
   if(b.dataset.opponentPly!=null){changeOpponentMove(Number(b.dataset.opponentPly));return;}
-  const actions={ 'mobile-preview-back':()=>stepPreview(-1),'mobile-preview-next':()=>stepPreview(1),'mobile-preview-return':returnToGame,'mobile-preview-details':showPreviewDetails,'ask-coach':askCoach,'mobile-ask-coach':askCoach,'coach-show-move':()=>revealCoachMove(),'coach-preview-move':()=>previewCoachMove(1),'coach-preview-reply':()=>previewCoachMove(2),'coach-play-move':playCoachMove,'coach-dismiss':dismissCoachHelp,'coach-retry-help':()=>{coachHelp=null;askCoach();},'mobile-back-board':()=>scrollToSection('board'),'mobile-change-opponent':()=>changeOpponentMove(),'mobile-more':openMobileTools,'mobile-game-tools':openMobileTools,'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
+  const actions={ 'mobile-preview-back':()=>stepPreview(-1),'mobile-preview-next':()=>stepPreview(1),'mobile-preview-return':returnToGame,'mobile-preview-details':togglePreviewExplanation,'ask-coach':askCoach,'mobile-ask-coach':askCoach,'coach-show-move':()=>revealCoachMove(),'coach-preview-move':()=>previewCoachMove(1),'coach-preview-reply':()=>previewCoachMove(2),'coach-play-move':playCoachMove,'coach-dismiss':dismissCoachHelp,'coach-retry-help':()=>{coachHelp=null;askCoach();},'mobile-back-board':()=>scrollToSection('board'),'mobile-change-opponent':()=>changeOpponentMove(),'mobile-more':openMobileTools,'mobile-game-tools':openMobileTools,'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
     'exit-preview':returnToGame,'cancel-opponent-edit':returnToGame,'change-opponent':changeOpponentMove,'explain-evaluation':explainEvaluation,'retry-evaluation':()=>{$('#info').close();positionAnalysis.retry(shownGame().fen());},'line-back':()=>stepPreview(-1),'line-next':()=>stepPreview(1),'history-start':()=>navigateHistory(0),'history-back':()=>stepHistory(-1),'history-next':()=>stepHistory(1),'history-live':returnToGame,'play-from-here':forkFromHistory,'show-punishment':showPlayedLine,backup:exportBackup,restore:()=>$('#backup-file').click(),pgn:exportPgn,
     'review-moves':()=>{tab='moves';render();},'review-game':()=>{if(!current||busy)return;finishGame();tab='moves';persist();render();},about:()=>{
       $('#info-body').innerHTML='<h2>A practice room of your own.</h2><p>Between Moves runs chess analysis on your device using Stockfish 19 Lite. Coaching uses programmed rules and verified engine continuations, with no AI API.</p><p>Games, retries, and learning history are stored in this browser using IndexedDB. No accounts, analytics, or game uploads. Your host still handles ordinary website requests.</p><p>Clearing browser data can erase history. Export backups regularly, and before switching domains, browsers, or devices. Import merges sessions without replacing existing records.</p><p>Opponent ratings are approximate targets. Level assessment is an experimental practice-difficulty estimate, not a calibrated platform rating. Positional explanations and practice book lines have limited coverage. Opening recognition uses the local Lichess opening-name database (CC0).</p><p>Stockfish.js is distributed under GPLv3. <a href="https://github.com/nmrugg/stockfish.js/tree/v19.0.1" target="_blank" rel="noreferrer">Engine source</a> · <a href="./engine/COPYING.txt" target="_blank">Engine licence</a>. Chess rules by chess.js (BSD-2-Clause).</p>';
