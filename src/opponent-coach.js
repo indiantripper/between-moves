@@ -6,7 +6,7 @@ const name=color=>color==='w'?'White':'Black';
 const targetName=p=>`your ${PIECE_NAMES[p.type]} on ${p.square}`;
 const squares=Array.from({length:64},(_,i)=>'abcdefgh'[i%8]+(1+Math.floor(i/8)));
 
-function pinBehind(game,move){
+export function pinBehind(game,move){
   const directions=[];
   if('bq'.includes(move.piece))directions.push([1,1],[1,-1],[-1,1],[-1,-1]);
   if('rq'.includes(move.piece))directions.push([1,0],[-1,0],[0,1],[0,-1]);
@@ -16,8 +16,8 @@ function pinBehind(game,move){
       const square='abcdefgh'[x]+(y+1),p=game.get(square);if(!p)continue;
       if(p.color===move.color)break;
       if(!first){if(p.type==='k')break;first={...p,square};continue;}
-      if(p.type==='k')return {piece:first,behind:'king'};
-      if(p.type==='q'&&VALUE[first.type]<9)return {piece:first,behind:'queen'};
+      if(p.type==='k')return {piece:first,behind:'king',behindSquare:square};
+      if(p.type==='q'&&VALUE[first.type]<9)return {piece:first,behind:'queen',behindSquare:square};
       break;
     }
   }

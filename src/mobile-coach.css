@@ -83,3 +83,12 @@
 .coach-step-lesson .coach-step-watch{padding:10px;border-left:3px solid #b18c4f;background:#f5eedf;border-radius:0 5px 5px 0;color:#654e2e}
 .coach-step-lesson .coach-step-next{font-size:14px;color:#56694f}
 .coach-original-idea{margin:12px 0}.coach-original-idea summary{min-height:44px;padding:10px 0;font-size:14px;color:#415f38;cursor:pointer}.coach-original-idea[open] summary{margin-bottom:8px}
+.coach-square-mark{position:absolute;inset:5%;border:3px solid #e0ac38;border-radius:7px;z-index:3;pointer-events:none}
+.coach-mark-threat{border-color:#b72428}.coach-mark-pin{border:4px double #663898}.coach-mark-support{border-color:#186853;border-style:dashed}.coach-mark-idea{border-color:#14617a;border-style:dotted}
+.coach-square-mark>span{position:absolute;right:0;top:0;background:#b72428;color:#fff;font:bold 12px Arial,sans-serif;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;border-radius:0 2px 0 4px}
+.coach-mark-pin>span{background:#663898}
+.coach-board-line{fill:none;stroke:#b72428;stroke-width:5;stroke-linecap:round;opacity:.85}
+.coach-line-pin{stroke:#663898;stroke-width:8;stroke-dasharray:12 7}.coach-line-support{stroke:#186853;stroke-width:4;stroke-dasharray:5 8}.coach-line-conditional{stroke-dasharray:16 10}
+.coach-highlight-legend{display:flex;gap:5px 12px;flex-wrap:wrap;font-size:12px;line-height:1.5;margin:8px 0 12px;color:#405a49}
+.coach-highlight-legend>span{border-left:3px solid #e0ac38;padding-left:5px}.coach-highlight-legend .legend-threat{border-color:#b72428}.coach-highlight-legend .legend-pin{border-color:#663898;border-left-style:double;border-left-width:4px}.coach-highlight-legend .legend-support{border-color:#186853;border-left-style:dashed}.coach-highlight-legend .legend-idea{border-color:#14617a;border-left-style:dotted}.coach-highlight-legend small{flex-basis:100%;font-size:11px}
+@media(max-width:900px){.coach-square-mark{border-width:2px}.coach-mark-pin{border-width:3px}.coach-square-mark>span{font-size:10px;min-width:13px;height:13px}.coach-highlight-legend{margin:6px 0 10px}}
