@@ -1,0 +1,70 @@
+.ask-coach-row{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:18px}
+.ask-coach-row small{font-size:12px;line-height:1.5;color:var(--secondary-text)}
+.ask-coach-row .button{flex-shrink:0}
+.coach-help{padding:16px;border:1px solid #d8e3cc;border-radius:8px;background:#f0f4e9;margin-bottom:18px}
+.coach-help h3{font-size:20px;margin:7px 0 10px}.coach-help p{font-size:16px;line-height:1.65;margin-bottom:12px;color:#405a49}
+.coach-help .button{margin:4px 6px 4px 0}.coach-help .help-line{font-family:monospace;overflow-wrap:anywhere;font-size:16px}
+.mobile-coach-tabs,.mobile-tools-button{display:none}
+@media(max-width:900px){
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+  #app{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+  .masthead{height:52px;min-height:52px;padding:0 12px;gap:8px;flex-shrink:0}
+  .brand small{display:none}.brand-mark{font-size:27px}.brand{font-size:18px}
+  .masthead>.button{min-height:40px;padding:7px 10px;font-size:12px}
+  main{display:flex;flex-direction:column;flex:1;min-height:0;padding:5px 10px 0;width:100%}
+  .workspace{display:flex;flex-direction:column;flex:1;min-height:0;gap:6px;align-items:center}
+  .play-area{width:min(100%,calc(100dvh - 298px));max-width:580px;flex-shrink:0;margin:0}
+  .play-area>.player-bar:first-child{min-height:26px;height:26px;margin:0 0 3px;gap:6px}
+  .play-area>.player-bar:first-child .avatar,.play-area>.player-bar:first-child small{display:none}
+  .play-area>.player-bar:first-child strong{font-size:12px}.status-pill{font-size:11px;padding:3px 6px}
+  .board-shell{border-width:3px}.bottom-player{display:none}
+  .evaluation-panel{margin:4px 0 0;padding:0}.evaluation-scale{font-size:10px;gap:6px}.evaluation-track{height:7px}
+  .evaluation-caption{min-height:24px;gap:6px}#evaluation-score{font-size:14px}#evaluation-headline{font-size:12px}#explain-evaluation{min-height:28px;padding:2px 8px;font-size:12px}
+  .timeline{display:flex;flex-wrap:nowrap;min-height:40px;padding:0;gap:3px;border-bottom:0}
+  .timeline-buttons{gap:0}.timeline .icon-button{height:40px;width:40px;min-height:40px;min-width:40px;font-size:20px}
+  #history-position{font-size:11px;flex:1;white-space:nowrap}
+  #reset-board,#change-opponent,#play-from-here{display:none}
+  .mobile-tools-button{display:inline-flex;min-height:40px;min-width:40px;padding:6px;font-size:21px}
+  .board-note{padding:0;gap:0}#opening-name{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#book-status{display:none}
+  .side-panel{display:flex;flex-direction:column;flex:1;width:100%;min-height:0;max-width:580px;margin:0;overflow:hidden;border-radius:10px 10px 0 0}
+  .panel-tabs{height:42px;min-height:42px;padding:0 12px;flex-shrink:0}.panel-tabs button{min-height:40px;font-size:13px;padding:0 4px}
+  #panel-content{min-height:0;flex:1;overflow-y:auto;overscroll-behavior:contain;padding:12px 13px 18px;scrollbar-gutter:stable}
+  .coach-header{margin-bottom:8px}.coach-header h2{font-size:17px;margin:0}.coach-header .eyebrow{display:none}.toggle{min-height:36px}
+  .ask-coach-row{display:none}.mobile-coach-tabs{display:flex;gap:8px;margin-bottom:10px}.mobile-coach-tabs button{flex:1;min-height:36px;padding:6px 10px;font-size:13px}.mobile-coach-tabs button.active{background:#e5eddd;color:#214d40;border-color:#bccdb0}
+  .side-panel[data-coach-view="coach"] .coach-candidates,.side-panel[data-coach-view="five"] .coach-overview{display:none}
+  .feedback-card{padding:12px}.feedback-top{font-size:15px;margin-bottom:6px}.move-token{font-size:16px;padding:4px 8px}
+  .feedback-card p{line-height:1.55;margin-bottom:8px}.feedback-card small{font-size:11px}
+  .opponent-idea{padding-top:8px;margin:9px 0}.opponent-idea-label{font-size:11px;margin-bottom:4px}
+  .feedback-card .opponent-idea p{font-size:15px;line-height:1.55}
+  .section-heading{margin-top:4px}.coach-empty{padding:8px 0}.coach-empty .empty-board,.coach-empty .empty-icon{display:none}.coach-empty h3{font-size:18px;margin:8px 0}.coach-empty p{margin:0 auto 10px;line-height:1.6}
+  .habit-card,.opponent-reply{margin-top:12px}.habit-card{display:none}.coach-help{padding:12px;margin-bottom:12px}.coach-help h3{font-size:18px}
+  .preview-bar{margin:3px 0;padding:4px 6px;font-size:12px}.preview-bar .button,.preview-bar .icon-button{min-height:36px;padding:4px 6px;font-size:12px}.preview-bar>span{display:none}
+  .opponent-edit-bar{padding:7px;margin:0 0 4px;gap:5px}.opponent-edit-bar p{font-size:12px;margin:2px 0}.opponent-edit-bar strong{font-size:13px}.opponent-edit-bar .button{min-height:36px}
+  main>footer{display:none}.mobile-dock{position:static;display:flex;flex-shrink:0;gap:8px;padding:6px 12px calc(6px + env(safe-area-inset-bottom));box-shadow:none;backdrop-filter:none}
+  .mobile-dock button{flex:1;min-height:44px;flex-direction:row;font-size:14px;gap:7px}.mobile-dock .mobile-ask{background:#214d40;color:#fff}
+  #toast{bottom:calc(65px + env(safe-area-inset-bottom))}
+  #mobile-tools .tools-grid{display:grid;gap:8px}#mobile-tools .button{width:100%;justify-content:flex-start}
+}
+@media(max-width:900px) and (orientation:landscape) and (max-height:600px){
+  .masthead{height:44px;min-height:44px}.workspace{flex-direction:row;align-items:stretch;gap:10px}
+  .play-area{width:min(48%,calc(100dvh - 152px));margin:auto 0;flex-shrink:0}.side-panel{max-width:none;flex:1}
+  .play-area>.player-bar:first-child{display:none}.board-note{display:none}.mobile-dock{padding-top:4px;padding-bottom:4px}.mobile-dock button{min-height:36px}
+}
+@media(max-width:900px){
+  .coach-header{float:right;width:44px;height:36px;margin:0}.coach-header>div{display:none}
+  .mobile-coach-tabs{margin-right:50px}.coach-help{clear:both}
+}
+@media(max-width:900px){.side-panel[data-coach-view="five"] .coach-help{display:none}}
+.mobile-top-five,.mobile-progress-label{display:none}
+@media(max-width:900px){
+  .mobile-top-five,.mobile-progress-label{display:inline}.desktop-progress-label{display:none}
+  .side-panel{position:relative}.panel-tabs{padding-right:60px;gap:7px}.panel-tabs button{font-size:12px;white-space:nowrap}
+  .coach-header{position:absolute;top:2px;right:9px;z-index:1;float:none}.mobile-coach-tabs{display:none}
+  .coach-help{margin-top:0}
+}
+@media(max-width:900px) and (max-height:700px) and (orientation:portrait){
+  .masthead{height:44px;min-height:44px}.play-area>.player-bar:first-child{display:none}
+  .evaluation-scale,.board-note{display:none}.evaluation-panel{margin-top:0}.evaluation-caption{min-height:28px}
+  .panel-tabs{height:38px;min-height:38px}.panel-tabs button{min-height:36px}
+  #panel-content{padding:9px 10px 14px}.coach-header{top:0}
+}
