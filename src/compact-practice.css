@@ -34,3 +34,11 @@ main{padding-top:16px}
   .timeline .coaching-switch select{width:82px;padding-left:5px;padding-right:3px}
   .timeline #review-game{font-size:11px;padding:5px 4px}
 }
+
+/* Keep the room’s identity without restoring the tall introductory banner. */
+.practice-brand-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:34px;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid #e3e5dc}
+.compact-brand{display:inline-flex;align-items:center;gap:8px;color:#214337;text-decoration:none;font-family:'Manrope',sans-serif;font-size:21px;font-weight:800;letter-spacing:-.8px;line-height:1.2}
+.compact-brand-light{font-weight:450}.compact-brand-knight{font-size:28px;line-height:1}
+.compact-saved{font-size:11px;color:#6c7d64;white-space:nowrap}.compact-saved>span{font-size:8px;color:#819e76;margin-right:4px}
+@media(max-width:900px){.practice-brand-bar{min-height:30px;margin-bottom:8px;padding-bottom:7px}.compact-brand{font-size:18px;gap:6px}.compact-brand-knight{font-size:24px}.compact-saved{font-size:10px}}
+@media(max-width:360px){.compact-saved{font-size:9px}.compact-brand{font-size:17px}}
