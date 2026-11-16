@@ -6,7 +6,7 @@ export function moveCaption(record,view=null) {
   if(!record)return 'Start a practice to play';
   if(view?.opponentEdit){
     const side=new Chess(view.fen).turn()==='w'?'White':'Black';
-    return `Instead of ${Math.floor(view.opponentEdit.ply/2)+1}${side==='White'?'.':'…'} ${view.opponentEdit.san} · Drag a ${side} piece`;
+    return `Instead of ${view.fen.split(' ')[5]}${side==='White'?'.':'…'} ${view.opponentEdit.san} · Drag a ${side} piece`;
   }
   if(view?.line){
     const shown=new Chess(view.base);
@@ -16,5 +16,5 @@ export function moveCaption(record,view=null) {
     return `Preview · ${history.slice(-2).map(label).join('  ·  ')}`;
   }
   const shown=positionAt(record,view?.historyPly ?? record.moves.length),history=shown.history({verbose:true});
-  return history.length?history.slice(-2).map(label).join('  ·  '):'Starting position · White to move';
+  return history.length?history.slice(-2).map(label).join('  ·  '):`Starting position · ${shown.turn()==='w'?'White':'Black'} to move`;
 }

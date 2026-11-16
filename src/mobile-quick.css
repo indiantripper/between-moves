@@ -12,8 +12,6 @@
 .grade-disc{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;font-size:17px;font-weight:700;flex-shrink:0}
 .grade-excellent .grade-disc{background:#176343;color:#fff}.grade-good .grade-disc{background:#d0e5ba;color:#385d29}.grade-ok .grade-disc{background:#e3ebd8;color:#536a43}
 .grade-medium .grade-disc{background:#f7d46d;color:#705414}.grade-mistake .grade-disc{background:#bd392b;color:#fff}.grade-blunder .grade-disc{background:#a9242e;color:#fff}.grade-neutral .grade-disc{background:#e9ede5;color:#607158}
-#mobile-grade-explanation{padding:12px 14px;background:#fffefa;border:1px solid #dfe5d7;border-radius:10px;margin-top:8px}
-#mobile-grade-explanation p{font-size:15px;line-height:1.65;margin:6px 0}.quick-explanation-title{font-weight:650}
 #mobile-quick-coach{margin-top:8px;padding:10px 12px;border:1px solid #d9e3ce;border-radius:10px;background:#fffefa;box-shadow:0 3px 12px #29423608}
 .quick-status{font-size:14px;line-height:1.5;margin:3px 0;color:#4a6141}
 .quick-choice-row{display:flex;align-items:center;gap:3px}
@@ -27,11 +25,10 @@
   .mobile-preview-coach:not(.is-expanded) #mobile-preview-text{display:none}
   .coach-preview-active>.mobile-glance{display:none}
 }
-.desktop-piece-explanation,.desktop-quick-suggestions{display:none}
+.desktop-quick-suggestions{display:none}
 @media(min-width:901px){
   .mobile-glance{display:none}
-  .desktop-piece-explanation,.desktop-quick-suggestions{display:block;margin:0 0 18px;padding:14px;border:1px solid #dfe5d7;border-radius:9px;background:#f7f9f2}
-  .desktop-piece-explanation h3{font-size:18px;margin:0 0 10px}.desktop-piece-explanation p{font-size:16px;line-height:1.65;margin:9px 0}
+  .desktop-quick-suggestions{display:block;margin:0 0 18px;padding:14px;border:1px solid #dfe5d7;border-radius:9px;background:#f7f9f2}
   .side-panel:has(.desktop-quick-suggestions) .coach-help{display:none}
   #desktop-quick-choice-explanation p{font-size:15px;line-height:1.65;margin:12px 0 8px}
   #desktop-quick-choice-explanation small{font-size:12px;line-height:1.6;color:#657453}

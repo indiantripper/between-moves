@@ -3,7 +3,7 @@ import { uciMove } from './coach.js';
 
 export function positionAt(record,ply) {
   const count=Math.max(0,Math.min(record.moves.length,Math.trunc(ply)));
-  const game=new Chess();
+  const game=new Chess(record.startFen);
   for(const move of record.moves.slice(0,count))game.move(uciMove(move));
   return game;
 }
@@ -35,4 +35,14 @@ export function replaceOpponentLine(record,ply,uci,id,created=new Date().toISOSt
   branch.moves.push(replacement.lan);
   branch.overrides.push({ply,before:replacement.before,after:replacement.after,uci:replacement.lan,san:replacement.san,replacedUci:original.lan,replacedSan:original.san});
   return branch;
+}
+
+export function historyRows(record) {
+  const history=positionAt(record,record.moves.length).history({verbose:true}),rows=[];
+  history.forEach((move,ply)=>{
+    const number=Number(move.before.split(' ')[5]);
+    let row=rows.at(-1);if(!row || row.number!==number){row={number,w:null,b:null};rows.push(row);}
+    row[move.color]=ply;
+  });
+  return rows;
 }

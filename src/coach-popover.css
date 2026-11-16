@@ -1,0 +1,6 @@
+.piece-grade-popover{position:fixed;inset:auto;margin:0;width:min(322px,calc(100vw - 24px));max-height:min(360px,calc(100dvh - 90px));overflow:auto;overscroll-behavior:contain;padding:14px;border:1px solid #d8e2cf;border-radius:13px;background:#fffefa;color:#294236;box-shadow:0 12px 44px #183a3030;font-family:'DM Sans',sans-serif}
+.piece-grade-heading{display:flex;align-items:center;gap:10px}
+.piece-grade-heading>div{flex:1;min-width:0}.piece-grade-heading h3{font-size:17px;line-height:1.4;margin:0}
+.piece-grade-heading .icon-button{width:40px;min-width:40px;min-height:44px;padding:4px;font-size:24px}
+.piece-grade-facts p{font-size:15px;line-height:1.65;margin:10px 0;color:#405a49}
+.piece-grade-popover>.button{min-height:44px;margin-top:4px;font-size:14px}

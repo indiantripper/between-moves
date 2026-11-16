@@ -46,8 +46,8 @@ export const OPENINGS = [
 const positionKey=fen=>fen.split(' ').slice(0,4).join(' ');
 export function openingAt(fen) { return openingIndex[positionKey(fen)] || null; }
 export function identifyOpening(game) {
-  const positions=[new Chess().fen(),...game.history({verbose:true}).map(m=>m.after)];
-  for(let ply=positions.length-1;ply>0;ply--){
+  const history=game.history({verbose:true}),positions=[history[0]?.before||game.fen(),...history.map(m=>m.after)];
+  for(let ply=positions.length-1;ply>=0;ply--){
     const opening=openingAt(positions[ply]);
     if(opening)return {...opening,ply,exact:ply===positions.length-1};
   }
