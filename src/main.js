@@ -6,6 +6,7 @@ import { openStore, readState, writeState, validateBackup } from './storage.js';
 import { positionAt, forkSession } from './timeline.js';
 import './style.css';
 import './interaction.css';
+import './readability.css';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -14,6 +15,7 @@ let db, state, game = new Chess(), current, selected = null, busy = true, engine
 let coachOn = true, awaiting = false, retrying = false, focus = null, preview = null, arrow = null;
 let tab = 'coach', generation = 0, flipped = false, toastTimer, saveQueue = Promise.resolve();
 let dragState=null, suppressClickUntil=0;
+let mobileDestination='board';
 const engine = new Engine(`${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`);
 engine.ready.then(() => { engineReady = true; busy = false; render(); resumeSession(); }).catch(handleError);
 
@@ -33,6 +35,7 @@ $('#app').innerHTML = `
     <aside class="side-panel"><div class="panel-tabs"><button class="active" data-panel="coach">Coach</button><button data-panel="moves">Moves</button><button data-panel="progress">My progress</button></div><div id="panel-content"></div></aside></div>
     <footer><span>Think first. Understand next. Keep growing.</span><button id="backup">Export backup</button><button id="restore">Import backup</button><button id="pgn">Export PGN</button><button id="about">About & privacy</button></footer>
   </main>
+  <nav class="mobile-dock" aria-label="Practice shortcuts"><button data-jump="board" class="active"><span class="dock-icon" aria-hidden="true">♟</span><span>Board</span></button><button data-jump="coach"><span class="dock-icon" aria-hidden="true">✦</span><span>Coach</span></button><button data-jump="moves"><span class="dock-icon" aria-hidden="true">☷</span><span>Moves</span></button><button data-jump="progress"><span class="dock-icon" aria-hidden="true">↗</span><span>Progress</span></button></nav>
   <dialog id="setup"><form id="setup-form"><div class="dialog-top"><span class="eyebrow">A FRESH POSITION, A FRESH PERSPECTIVE</span><button type="button" class="icon-button" data-close="setup" aria-label="Close setup">×</button></div><h2>Set up your practice.</h2><p class="muted">Choose the challenge. We’ll meet you where you are.</p>
     <div class="form-grid"><label>Your teaching level<select name="level"><option value="600">600 · Learning the basics</option><option value="900">900 · Building foundations</option><option value="1100">1100 · Finding your rhythm</option><option value="1350" selected>1350 · Club player</option><option value="1600">1600 · Sharpening your game</option><option value="1900">1900 · Advanced</option><option value="2200">2200 · Expert</option><option value="2500">2500 · Master</option></select></label><label>Opponent target strength<input name="opponent" type="number" min="400" max="3000" step="50" value="1350" required/><small>Approximate engine strength, not a platform rating.</small></label></div>
     <label class="check-label"><input type="checkbox" name="assess"/> Assess my level as I play <small>Starts at 1200 difficulty; adjusts after 20 unassisted moves. Provisional, not a calibrated rating.</small></label>
@@ -58,6 +61,18 @@ function playerLevel() { return current?.level || state?.settings.level || 1350;
 function squarePoint(square) {
   let x = square.charCodeAt(0)-97, y = 8-Number(square[1]);
   if (flipped) { x=7-x; y=7-y; } return [x*100+50,y*100+50];
+}
+function updateMobileDock() {
+  document.querySelectorAll('[data-jump]').forEach(b=>{b.classList.toggle('active',b.dataset.jump===mobileDestination);if(b.dataset.jump===mobileDestination)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current');});
+}
+function scrollToSection(destination) {
+  mobileDestination=destination;updateMobileDock();
+  const target=destination==='board'?$('.play-area'):destination==='coach' && preview?.details?$('.variation-card')||$('.side-panel'):$('.side-panel');
+  target.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
+}
+function variationExplanation() {
+  const details=preview?.details;
+  return details?`<div class="variation-card"><strong>${esc(details.text)}</strong><p>${esc(details.moves)}</p><small>${esc(details.note)}</small></div>`:'';
 }
 function drawBoard() {
   const shown = preview ? new Chess(preview.fen) : game;
@@ -98,6 +113,7 @@ function render() {
   $('#reset-board').disabled = !engineReady || busy || !current;
   document.querySelectorAll('[data-panel]').forEach(b=>b.classList.toggle('active',b.dataset.panel===tab));
   document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===(tab==='progress'?'progress':'coach')));
+  updateMobileDock();
   drawBoard();
   if (tab==='coach') renderCoach(active); else if (tab==='moves') renderMoves(); else renderProgress();
 }
@@ -111,8 +127,8 @@ function renderCoach(active) {
     html+=`<div class="feedback-card severity-${grade.severity}"><div class="feedback-top"><span class="move-token">${esc(f.san)}</span><strong>${esc(grade.label)}</strong><span class="feedback-symbol">${grade.severity>=2?'?!':grade.severity===1?'?!':'✓'}</span></div>${f.explanation.facts.map(t=>`<p>${esc(t)}</p>`).join('')}<small>${f.inherited?'Original line · saved analysis':f.retry?'Practice variation · assisted':f.assisted?'Coached first attempt':'Unassisted first attempt'}</small></div>`;
     html+=`<div class="section-heading"><h3>Five ways forward</h3><span>Before your ${esc(f.san)}</span></div><div class="candidate-labels"><span>ENGINE CHOICE</span><span>WHITE EVAL.</span></div><div class="candidates">${f.lines.map((line,i)=>{
       const san=sanLine(f.before,line.pv,1)[0], mine=line.pv[0]===f.uci, opening=openingForMove(f.before,line.pv[0]);
-      return `<button class="candidate ${mine?'your-move':''}" data-candidate="${i}" ${busy?'disabled':''}><span class="candidate-rank">${i+1}</span><span class="candidate-description"><strong>${esc(san)}</strong>${opening?`<small>${esc(opening.name)}</small>`:''}</span>${mine?'<span class="mine-label">YOUR MOVE</span>':''}<span class="candidate-eval">${displayScore(line,new Chess(f.before).turn())}</span><span class="candidate-arrow">↗</span></button>`;
-    }).join('')}</div><p class="analysis-note">Depth ${f.depth} · Stockfish 19 Lite · evaluations favour White when positive. Close scores can be equally playable.</p><div id="candidate-explanation"></div>`;
+      return `<button class="candidate ${mine?'your-move':''}" data-candidate="${i}" ${busy?'disabled':''}><span class="candidate-rank">${i+1}</span><span class="candidate-description"><span class="candidate-title"><strong>${esc(san)}</strong>${mine?'<span class="mine-label">YOUR MOVE</span>':''}</span>${opening?`<small>${esc(opening.name)}</small>`:''}</span><span class="candidate-eval">${displayScore(line,new Chess(f.before).turn())}</span><span class="candidate-arrow">↗</span></button>`;
+    }).join('')}</div><p class="analysis-note">Depth ${f.depth} · Stockfish 19 Lite · evaluations favour White when positive. Close scores can be equally playable.</p><div id="candidate-explanation">${variationExplanation()}</div>`;
     html+=`<div class="decision-buttons"><button class="button secondary" id="retry" ${busy?'disabled':''}>↶ Retry this move</button>${f.actual?.pv?.length>1?`<button class="button secondary" id="show-punishment" ${busy?'disabled':''}>See strongest reply ↗</button>`:''}</div>`;
     if (!f.lines.some(l=>l.pv[0]===f.uci)) html+=`<p class="analysis-note">Your move ${esc(f.san)}: ${displayScore(f.actual,new Chess(f.before).turn())}. Analysed separately from the top five.</p>`;
   } else {
@@ -164,6 +180,7 @@ async function startGame(event) {
   state.games.push(current); state.active=current.id; game=new Chess(); coachOn=current.coach; flipped=current.color==='b';
   generation++; awaiting=false; retrying=false; focus=null; preview=null; arrow=null; selected=null; tab='coach';
   $('#setup').close(); await persist(); render();
+  if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
   if(current.color==='b') opponentTurn();
 }
 async function resetBoard() {
@@ -174,6 +191,7 @@ async function resetBoard() {
   state.games.push(current);state.active=current.id;game=new Chess();flipped=color==='b';
   generation++;awaiting=false;retrying=false;focus=null;preview=null;arrow=null;selected=null;tab='coach';
   await persist();render();toast('Board reset. Your previous game is saved in My progress.');
+  if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
   if(color==='b')opponentTurn();
 }
 async function makeMove(from,to,promotion='q',recovered=null) {
@@ -241,8 +259,9 @@ function continueGame() { if(busy || !current || current.finished)return; awaiti
 function showCandidate(index) {
   const line=focus?.lines[index]; if(!line)return;
   preview={fen:focus.before,label:`${sanLine(focus.before,line.pv,1)[0]} · engine variation`,base:focus.before,line:line.pv,step:0};
+  preview.details={text:explainCandidate(focus.before,line,playerLevel()),moves:sanLine(focus.before,line.pv,10).join('  '),note:'Use the arrows below the board to follow this line.'};
   arrow=uciMove(line.pv[0]); selected=null; render();
-  $('#candidate-explanation').innerHTML=`<div class="variation-card"><strong>${esc(explainCandidate(focus.before,line,playerLevel()))}</strong><p>${esc(sanLine(focus.before,line.pv,10).join('  '))}</p><small>Use the arrows below the board to follow this line.</small></div>`;
+  if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
 }
 function stepPreview(delta) {
   if(!preview?.line)return; preview.step=Math.max(0,Math.min(preview.line.length,preview.step+delta));
@@ -270,13 +289,15 @@ function forkFromHistory(autoReply=true) {
   current=branch;state.games.push(branch);state.active=branch.id;game=historyGame();generation++;
   coachOn=branch.coach??true;awaiting=false;retrying=true;preview=null;arrow=null;selected=null;focus=branch.attempts.at(-1)||null;tab='coach';
   persist();render();toast('Alternate line started. Your original game is saved in My progress.');
+  if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
   if(autoReply && game.turn()!==current.color)opponentTurn();
 }
 function showPlayedLine() {
   const line=focus?.actual;if(!line?.pv?.length)return;
   preview={fen:focus.before,label:`Strongest reply to ${focus.san}`,base:focus.before,line:line.pv,step:0};
+  preview.details={text:`The engine’s strongest continuation against ${focus.san}.`,moves:sanLine(focus.before,line.pv,12).join('  '),note:'Step forward to see the reply and how the position develops. Your chosen-strength opponent may play a different move.'};
   arrow=null;stepPreview(1);render();
-  $('#candidate-explanation').innerHTML=`<div class="variation-card"><strong>The engine’s strongest continuation against ${esc(focus.san)}.</strong><p>${esc(sanLine(focus.before,line.pv,12).join('  '))}</p><small>Step forward to see the reply and how the position develops. Your chosen-strength opponent may play a different move.</small></div>`;
+  if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
 }
 function viewHistory(index) {
   if(busy) return;
@@ -284,6 +305,7 @@ function viewHistory(index) {
   navigateHistory(index+1);
   const attempt=[...current.attempts].reverse().find(a=>a.ply===index && a.uci===move.lan);
   if(attempt){ focus=attempt; tab='coach'; } render();
+  if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
 }
 function download(name,data,type='application/json') { const url=URL.createObjectURL(new Blob([data],{type})); const a=document.createElement('a'); a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000); }
 function exportBackup() { download(`between-moves-backup-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(state,null,2)); toast('Backup exported. Keep it to restore your history or move devices.'); }
@@ -313,6 +335,7 @@ function openRecord(id) {
   current=record;game=historyGame();state.active=id;coachOn=current.coach ?? true;flipped=current.color==='b';focus=current.attempts.at(-1)||null;
   awaiting=false;
   preview=null;arrow=null;selected=null;retrying=!!current.retrying;tab=current.finished?'moves':'coach';generation++;persist();render();
+  if(matchMedia('(max-width:900px)').matches)scrollToSection(current.finished?'moves':'board');
   resumeSession();
 }
 function resumeSession() {
@@ -362,7 +385,8 @@ document.addEventListener('pointermove',e=>{
     dragState.active=true;selected=dragState.from;$('#board').setPointerCapture(e.pointerId);drawBoard();
     const ghost=document.createElement('div');ghost.id='drag-piece';ghost.className='drag-ghost';
     ghost.innerHTML=`<span class="piece ${dragState.piece.color==='w'?'white':'black'}">${glyphs[dragState.piece.type]}</span>`;
-    ghost.style.width=`${$('#board').getBoundingClientRect().width/8}px`;document.body.append(ghost);
+    const boardWidth=$('#board').getBoundingClientRect().width;
+    ghost.style.width=`${boardWidth/8}px`;ghost.style.fontSize=`${boardWidth/10}px`;document.body.append(ghost);
   }
   const ghost=$('#drag-piece');ghost.style.left=`${e.clientX}px`;ghost.style.top=`${e.clientY}px`;
   document.querySelector('.drop-target')?.classList.remove('drop-target');
@@ -385,7 +409,14 @@ window.addEventListener('blur',()=>{if(dragState)releaseDrag({pointerId:dragStat
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   if(b.dataset.close){$('#'+b.dataset.close).close();return;}
-  if(b.dataset.tab){tab=b.dataset.tab;render();return;} if(b.dataset.panel){tab=b.dataset.panel;render();return;}
+  if(b.dataset.jump){
+    mobileDestination=b.dataset.jump;
+    if(mobileDestination!=='board')tab=mobileDestination;
+    render();
+    scrollToSection(mobileDestination);
+    return;
+  }
+  if(b.dataset.tab){tab=b.dataset.tab;mobileDestination=tab;render();return;} if(b.dataset.panel){tab=b.dataset.panel;mobileDestination=tab;render();return;}
   if(b.dataset.candidate!=null){showCandidate(Number(b.dataset.candidate));return;}
   if(b.dataset.history!=null){viewHistory(Number(b.dataset.history));return;} if(b.dataset.game){openRecord(b.dataset.game);return;}
   const actions={ 'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,

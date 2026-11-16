@@ -24,6 +24,8 @@ With Git and GitHub CLI authenticated to the repository owner, run `npm run depl
 
 ## Behaviour
 
+- Coaching explanations use a 16px reading size; move suggestions use 21px labels, with 14px opening names and larger touch targets. Desktop keeps the board alongside the coaching as you scroll. Phone and tablet layouts stack the board and coaching with fixed Board / Coach / Moves / Progress shortcuts. Selecting a candidate opens its board preview; returning to Coach preserves and shows the selected variation explanation. Narrow forms use a single column with 16px inputs.
+
 - Drag a piece to a legal destination with a mouse or touch. Click-to-move also works. Promotion offers all four choices.
 - Coach mode compares your played move to up to five alternatives from the position **before** the move. Candidate lines can be stepped through on the board.
 - The opponent responds automatically in both coaching modes. Retry remains available after that reply, including after a game ends.
