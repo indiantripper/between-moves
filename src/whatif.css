@@ -30,3 +30,10 @@
   .opponent-edit-bar .button{margin-left:auto}
   .move-cell .move-override{min-width:38px}
 }
+
+/* Supporting explanation inside the existing feedback card. */
+.opponent-idea{border-top:1px solid #cfddc7;margin:14px 0;padding-top:12px}
+.opponent-idea-label{display:block;font-size:12px;line-height:1.5;font-weight:700;letter-spacing:.6px;color:#4b6741;margin-bottom:7px}
+.feedback-card .opponent-idea p,.opponent-idea p{font-size:15px;line-height:1.65;color:#415d43;margin:6px 0}
+.opponent-idea strong{font-weight:650}
+.feedback-card .opponent-idea-watch,.opponent-idea-watch{color:#705735}

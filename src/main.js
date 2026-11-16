@@ -5,6 +5,7 @@ import { PIECE_NAMES, uciMove, displayScore, gradeMove, explainMove, explainCand
 import { openStore, readState, writeState, validateBackup } from './storage.js';
 import { positionAt, forkSession, opponentMoveAt, replaceOpponentLine } from './timeline.js';
 import { positionEvaluation, LatestPositionAnalysis } from './evaluation.js';
+import { explainOpponentMove } from './opponent-coach.js';
 import './style.css';
 import './interaction.css';
 import './readability.css';
@@ -71,6 +72,18 @@ function shownGame() { return preview?.historyPly!=null?positionAt(current,previ
 function moveColor() { return preview?.opponentEdit?shownGame().turn():current?.color; }
 function opponentTarget() { return !current || preview?.line || preview?.opponentEdit?null:opponentMoveAt(current,preview?.historyPly ?? current.moves.length); }
 function evaluationVisible() { return !!current && (coachOn || current.finished); }
+function opponentIdeaMarkup() {
+  if(!current || (!coachOn&&!current.finished) || preview?.line || preview?.opponentEdit)return '';
+  const history=historyGame().history({verbose:true}),cutoff=preview?.historyPly ?? history.length;
+  let index=cutoff-1,next=false;
+  if(history[index]?.color===current.color && preview?.historyPly!=null && history[cutoff]?.color!==current.color && history[cutoff]){index=cutoff;next=true;}
+  const move=history[index];if(!move || move.color===current.color)return '';
+  const cached=positionAnalysis.cache.get(move.after)?.analysis;
+  const idea=explainOpponentMove({before:move.before,uci:move.lan,previousMove:history[index-1],analysis:cached?{...cached,fen:move.after}:null,level:playerLevel()});
+  if(!idea)return '';
+  return `<div class="opponent-idea"><span class="opponent-idea-label">${next?`NEXT ${idea.side.toUpperCase()} REPLY`:`${idea.side.toUpperCase()}’S IDEA`} · ${esc(idea.san)}</span><p>${esc(idea.reason)}</p><p><strong>Possible plan:</strong> ${esc(idea.plan)}</p>${idea.watch?`<p class="opponent-idea-watch"><strong>Watch:</strong> ${esc(idea.watch)}</p>`:''}</div>`;
+}
+function paintOpponentIdea() { const slot=$('#opponent-idea-slot');if(slot)slot.innerHTML=opponentIdeaMarkup(); }
 function evaluationState() {
   const shown=shownGame(),state=positionAnalysis.state?.fen===shown.fen()?positionAnalysis.state:null;
   return {shown,state,model:positionEvaluation(shown,state?.analysis)};
@@ -85,6 +98,7 @@ function paintEvaluation() {
   $('#evaluation-track').classList.toggle('is-pending',!model.terminal && !analysis?.analysis);
   $('#evaluation-track').setAttribute('aria-label',`${model.headline}. ${model.score==='—'?'':`Evaluation ${model.score} from White’s perspective.`}`);
   $('#explain-evaluation').disabled=busy || (!model.terminal && (!analysis || analysis.loading));
+  paintOpponentIdea();
 }
 function syncEvaluation() {
   const visible=evaluationVisible();$('#evaluation-panel').hidden=!visible;
@@ -180,7 +194,7 @@ function renderCoach(active) {
     html+=`<div class="coach-empty"><span class="empty-icon">♘</span><h3>Just you and the board.</h3><p>Play freely. Your moves are saved for the review. Bring the coach back whenever you like.</p></div>`;
   } else if (f && (coachOn || !active)) {
     const grade=f.grade;
-    html+=`<div class="feedback-card severity-${grade.severity}"><div class="feedback-top"><span class="move-token">${esc(f.san)}</span><strong>${esc(grade.label)}</strong><span class="feedback-symbol">${grade.severity>=2?'?!':grade.severity===1?'?!':'✓'}</span></div>${f.explanation.facts.map(t=>`<p>${esc(t)}</p>`).join('')}<small>${f.inherited?'Original line · saved analysis':f.retry?'Practice variation · assisted':f.assisted?'Coached first attempt':'Unassisted first attempt'}</small></div>`;
+    html+=`<div class="feedback-card severity-${grade.severity}"><div class="feedback-top"><span class="move-token">${esc(f.san)}</span><strong>${esc(grade.label)}</strong><span class="feedback-symbol">${grade.severity>=2?'?!':grade.severity===1?'?!':'✓'}</span></div>${f.explanation.facts.map(t=>`<p>${esc(t)}</p>`).join('')}<div id="opponent-idea-slot">${opponentIdeaMarkup()}</div><small>${f.inherited?'Original line · saved analysis':f.retry?'Practice variation · assisted':f.assisted?'Coached first attempt':'Unassisted first attempt'}</small></div>`;
     html+=`<div class="section-heading"><h3>Five ways forward</h3><span>Before your ${esc(f.san)}</span></div><div class="candidate-labels"><span>ENGINE CHOICE</span><span>WHITE EVAL.</span></div><div class="candidates">${f.lines.map((line,i)=>{
       const san=sanLine(f.before,line.pv,1)[0], mine=line.pv[0]===f.uci, opening=openingForMove(f.before,line.pv[0]);
       return `<button class="candidate ${mine?'your-move':''}" data-candidate="${i}" ${busy?'disabled':''}><span class="candidate-rank">${i+1}</span><span class="candidate-description"><span class="candidate-title"><strong>${esc(san)}</strong>${mine?'<span class="mine-label">YOUR MOVE</span>':''}</span>${opening?`<small>${esc(opening.name)}</small>`:''}</span><span class="candidate-eval">${displayScore(line,new Chess(f.before).turn())}</span><span class="candidate-arrow">↗</span></button>`;
@@ -190,6 +204,7 @@ function renderCoach(active) {
   } else {
     html+=`<div class="coach-empty"><div class="empty-board">♘<span>✦</span></div><h3>${current?'Your move. Your discovery.':'A good habit starts here.'}</h3><p>${current?'Make a move on the board. We’ll compare five possibilities, unpack the idea, and keep what you learn.':'Choose an opening and a worthy opponent. Your coach will help you understand the choices between moves.'}</p>${!current?'<button class="button primary" id="start-first">Start your first practice ↗</button>':''}</div>`;
   }
+  if(!f && (coachOn||!active))html+=`<div id="opponent-idea-slot">${opponentIdeaMarkup()}</div>`;
   if(current && coachOn && !preview){
     const last=game.history({verbose:true}).at(-1);
     const manual=current.overrides?.find(o=>o.ply===current.moves.length-1&&o.uci===last?.lan);
