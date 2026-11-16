@@ -196,3 +196,16 @@ footer button{font-size:13px;min-height:44px;color:#556c49}
   .color-options span{padding:12px 10px}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}.button:hover{transform:none}}
+
+/* Tools stay easy to find in the app header on every screen. */
+.masthead-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.tools-gear{display:inline-flex;align-items:center;justify-content:center;width:44px;min-width:44px;height:44px;padding:0;border:1px solid #d8e2cf;border-radius:9px;background:#edf2e7;color:#31573b;font-size:25px;line-height:1}
+.tools-gear:hover{background:#e1ead8}
+#mobile-tools .tools-grid{display:grid;gap:8px}#mobile-tools .tools-grid .button{width:100%;justify-content:flex-start}
+@media(max-width:900px){.masthead-actions{margin-left:auto}.masthead-actions #new-game{width:44px;height:44px;min-height:44px;padding:0;font-size:23px}.new-practice-label{display:none}}
+
+/* Keep reset in the first fold, alongside new practice and tools. */
+.masthead-actions #reset-board{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin:0;min-height:44px;padding:0 12px;font-size:14px;border:1px solid #dce2d5;border-radius:9px;background:#f0f3e9;white-space:nowrap}
+.top-reset>span:first-child{font-size:24px;line-height:1}
+@media(max-width:900px){.masthead-actions{gap:4px}.masthead-actions #reset-board{width:44px;padding:0}.reset-label{display:none}.masthead .brand{gap:5px;font-size:18px}.masthead .brand-mark{font-size:30px}.masthead .brand small{letter-spacing:1px}}
+[hidden]{display:none!important}

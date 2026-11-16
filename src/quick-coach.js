@@ -34,5 +34,6 @@ export function pieceQualityTarget(record,game,attempt) {
   let original;
   try{original=new Chess(attempt.before).get(from);}catch{return null;}
   const piece=game.get(to),type=attempt.uci[4]||original?.type;
-  return original?.color===record.color && piece?.color===record.color && piece.type===type?to:null;
+  const mover=record.mode==='free'?original?.color:record.color;
+  return original?.color===mover && piece?.color===mover && piece?.type===type?to:null;
 }

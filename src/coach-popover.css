@@ -4,3 +4,7 @@
 .piece-grade-heading .icon-button{width:40px;min-width:40px;min-height:44px;padding:4px;font-size:24px}
 .piece-grade-facts p{font-size:15px;line-height:1.65;margin:10px 0;color:#405a49}
 .piece-grade-popover>.button{min-height:44px;margin-top:4px;font-size:14px}
+
+.comparison-cost{color:#637153!important;font-size:13px!important}
+.move-line-comparison{margin:8px 0}.move-line-comparison summary{min-height:44px;display:flex;align-items:center;color:#31573b;font-size:14px;text-decoration:underline;cursor:pointer}
+.move-line-comparison small{display:block;font-size:12px;line-height:1.6;color:#65735e}
