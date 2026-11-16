@@ -1,3 +1,4 @@
+import { Chess } from 'chess.js';
 import { coachSuggestion } from './ask-coach.js';
 import { gradeMove } from './coach.js';
 
@@ -23,4 +24,15 @@ export function playableChoices(fen,lines,level=1350) {
     choices.push({suggestion,grade,best:line.pv[0]===best.pv[0]});
   }
   return choices;
+}
+
+// A reply can capture the moved piece. Never put its grade on an opponent's
+// replacement piece; callers can show a small fallback chip in that case.
+export function pieceQualityTarget(record,game,attempt) {
+  if(!record || !attempt || record.moves[attempt.ply]!==attempt.uci)return null;
+  const from=attempt.uci.slice(0,2),to=attempt.uci.slice(2,4);
+  let original;
+  try{original=new Chess(attempt.before).get(from);}catch{return null;}
+  const piece=game.get(to),type=attempt.uci[4]||original?.type;
+  return original?.color===record.color && piece?.color===record.color && piece.type===type?to:null;
 }

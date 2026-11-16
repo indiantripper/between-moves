@@ -22,3 +22,26 @@ test('Black suggestions preserve mover-perspective scores and do not mutate engi
   const game=new Chess();game.move('e4');const lines=[{cp:15,pv:['e7e5']},{cp:5,pv:['c7c5']},{cp:-400,pv:['g7g5']}],before=structuredClone(lines);
   assert.deepEqual(playableChoices(game.fen(),lines).map(c=>c.suggestion.san),['e5','c5']);assert.deepEqual(lines,before);
 });
+
+test('the piece badge follows the last move and never grades its captor',async()=>{
+  const {pieceQualityTarget}=await import('../src/quick-coach.js');
+  const game=new Chess(),moves=[];
+  moves.push(game.move('e4').lan);const before=game.fen();
+  const own=game.move('e5');moves.push(own.lan);
+  const record={color:'b',moves},attempt={ply:1,uci:own.lan,before};
+  assert.equal(pieceQualityTarget(record,game,attempt),'e5');
+  moves.push(game.move('d4').lan);assert.equal(pieceQualityTarget(record,game,attempt),'e5');
+  moves.push(game.move('Nc6').lan);moves.push(game.move('dxe5').lan);
+  assert.equal(pieceQualityTarget(record,game,attempt),null);
+  assert.equal(pieceQualityTarget(record,game,{...attempt,uci:'g8f6'}),null);
+});
+test('badge anchors handle castling and promotion',async()=>{
+  const {pieceQualityTarget}=await import('../src/quick-coach.js');
+  for(const [fen,uci,target] of [
+    ['r3k2r/ppp2ppp/2n5/8/8/8/PPP2PPP/R3K2R w KQkq - 0 1','e1g1','g1'],
+    ['4k3/P7/8/8/8/8/8/4K3 w - - 0 1','a7a8q','a8']
+  ]){
+    const game=new Chess(fen);game.move({from:uci.slice(0,2),to:uci.slice(2,4),promotion:uci[4]||'q'});
+    assert.equal(pieceQualityTarget({color:'w',moves:[uci]},game,{ply:0,uci,before:fen}),target);
+  }
+});

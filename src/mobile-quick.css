@@ -1,24 +1,38 @@
-.mobile-glance{display:none}
+/* Shared compact coaching controls; the board/sidebar proportions stay unchanged. */
+.board-best-button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;padding:0;border:1px solid #d6e1ce;border-radius:10px;background:#edf2e7;color:#214d40;font-size:25px;line-height:1}
+.board-best-button:hover{background:#e1ead8}
+.board-quality-overlay{position:absolute;inset:0;z-index:7;pointer-events:none}
+.piece-quality-control{position:absolute;display:flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:transparent;transform:translate(-50%,-50%);pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none}
+.piece-quality-control .grade-disc{width:25px;height:25px;font-size:13px;box-shadow:0 0 0 2px #fffefa,0 2px 5px #183a3040}
+.mobile-glance{display:block;margin:8px 0 0}
+.mobile-glance-row{display:flex;align-items:center;justify-content:flex-start;gap:10px}
+.mobile-grade-button{display:flex;align-items:center;gap:9px;min-height:44px;padding:5px 9px;border:0;border-radius:10px;background:transparent;text-align:left}
+.mobile-grade-button>span:last-child{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.mobile-grade-button strong{font-size:17px}.mobile-grade-button small{font-size:12px;color:#52614e}
+.grade-disc{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;font-size:17px;font-weight:700;flex-shrink:0}
+.grade-excellent .grade-disc{background:#176343;color:#fff}.grade-good .grade-disc{background:#d0e5ba;color:#385d29}.grade-ok .grade-disc{background:#e3ebd8;color:#536a43}
+.grade-medium .grade-disc{background:#f7d46d;color:#705414}.grade-mistake .grade-disc{background:#bd392b;color:#fff}.grade-blunder .grade-disc{background:#a9242e;color:#fff}.grade-neutral .grade-disc{background:#e9ede5;color:#607158}
+#mobile-grade-explanation{padding:12px 14px;background:#fffefa;border:1px solid #dfe5d7;border-radius:10px;margin-top:8px}
+#mobile-grade-explanation p{font-size:15px;line-height:1.65;margin:6px 0}.quick-explanation-title{font-weight:650}
+#mobile-quick-coach{margin-top:8px;padding:10px 12px;border:1px solid #d9e3ce;border-radius:10px;background:#fffefa;box-shadow:0 3px 12px #29423608}
+.quick-status{font-size:14px;line-height:1.5;margin:3px 0;color:#4a6141}
+.quick-choice-row{display:flex;align-items:center;gap:3px}
+.quick-choice-name{display:flex;align-items:center;gap:7px;flex-wrap:wrap;flex:1;min-width:0;color:#325539}
+.quick-choice-name strong{font-size:22px}.quick-choice-name>span{font-size:20px}.quick-choice-name small{font-size:11px;color:#617353;flex-basis:100%}
+.quick-choice-row .icon-button{min-width:40px;min-height:44px;padding:6px;font-size:22px}
+.quick-choice-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}.quick-choice-actions .button{flex:1;min-height:44px;padding:7px 8px;font-size:13px;gap:4px}
+#quick-choice-explanation p{font-size:15px;line-height:1.65;margin:12px 0 8px}#quick-choice-explanation small{font-size:12px;line-height:1.6;color:#657453}
 @media(max-width:900px){
-  .mobile-glance{display:block;margin:8px 0 0}
-  .mobile-glance-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .mobile-grade-button,.mobile-best-button{display:flex;align-items:center;gap:9px;min-height:48px;padding:5px 9px;border:0;border-radius:10px;background:transparent;text-align:left}
-  .mobile-grade-button>span:last-child{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-  .mobile-grade-button strong{font-size:17px}.mobile-grade-button small{font-size:12px;color:#52614e}
-  .grade-disc{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;font-size:17px;font-weight:700;flex-shrink:0}
-  .grade-excellent .grade-disc{background:#176343;color:#fff}.grade-good .grade-disc{background:#d0e5ba;color:#385d29}.grade-ok .grade-disc{background:#e3ebd8;color:#536a43}
-  .grade-medium .grade-disc{background:#f7d46d;color:#705414}.grade-mistake .grade-disc{background:#bd392b;color:#fff}.grade-blunder .grade-disc{background:#a9242e;color:#fff}.grade-neutral .grade-disc{background:#e9ede5;color:#607158}
-  .mobile-best-button{background:#214d40;color:#fff;font-size:13px;font-weight:600;white-space:nowrap;padding:8px 12px;flex-shrink:0}.mobile-best-button>span:first-child{font-size:21px}
-  #mobile-grade-explanation{padding:12px 14px;background:#fffefa;border:1px solid #dfe5d7;border-radius:10px;margin-top:8px}
-  #mobile-grade-explanation p{font-size:15px;line-height:1.65;margin:6px 0}.quick-explanation-title{font-weight:650}
-  #mobile-quick-coach{margin-top:8px;padding:10px 12px;border:1px solid #d9e3ce;border-radius:10px;background:#fffefa;box-shadow:0 3px 12px #29423608}
-  .quick-status{font-size:14px;line-height:1.5;margin:3px 0;color:#4a6141}
-  .quick-choice-row{display:flex;align-items:center;gap:3px}
-  .quick-choice-name{display:flex;align-items:center;gap:7px;flex-wrap:wrap;flex:1;min-width:0;color:#325539}
-  .quick-choice-name strong{font-size:22px}.quick-choice-name>span{font-size:20px}.quick-choice-name small{font-size:11px;color:#617353;flex-basis:100%}
-  .quick-choice-row .icon-button{min-width:40px;min-height:44px;padding:6px;font-size:22px}
-  .quick-choice-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}.quick-choice-actions .button{flex:1;min-height:44px;padding:7px 8px;font-size:13px;gap:4px}
-  #quick-choice-explanation p{font-size:15px;line-height:1.65;margin:12px 0 8px}#quick-choice-explanation small{font-size:12px;line-height:1.6;color:#657453}
+  .mobile-dock .mobile-ask{flex:0 0 44px;max-width:44px;padding:0;font-size:24px}
   .mobile-preview-coach:not(.is-expanded) #mobile-preview-text{display:none}
   .coach-preview-active>.mobile-glance{display:none}
+}
+.desktop-piece-explanation,.desktop-quick-suggestions{display:none}
+@media(min-width:901px){
+  .mobile-glance{display:none}
+  .desktop-piece-explanation,.desktop-quick-suggestions{display:block;margin:0 0 18px;padding:14px;border:1px solid #dfe5d7;border-radius:9px;background:#f7f9f2}
+  .desktop-piece-explanation h3{font-size:18px;margin:0 0 10px}.desktop-piece-explanation p{font-size:16px;line-height:1.65;margin:9px 0}
+  .side-panel:has(.desktop-quick-suggestions) .coach-help{display:none}
+  #desktop-quick-choice-explanation p{font-size:15px;line-height:1.65;margin:12px 0 8px}
+  #desktop-quick-choice-explanation small{font-size:12px;line-height:1.6;color:#657453}
 }
