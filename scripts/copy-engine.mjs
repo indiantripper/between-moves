@@ -1,0 +1,11 @@
+import { copyFile, mkdir, readdir } from 'node:fs/promises';
+import path from 'node:path';
+const directory = 'node_modules/stockfish/bin';
+const files = await readdir(directory);
+const script = files.find(f => /^stockfish-.*-lite-single\.js$/.test(f));
+if (!script) throw Error('Single-threaded Stockfish engine missing from package.');
+await mkdir('public/engine',{ recursive:true });
+for (const file of [script,script.replace('.js','.wasm')]) await copyFile(path.join(directory,file),path.join('public/engine',file));
+await copyFile('node_modules/stockfish/Copying.txt','public/engine/COPYING.txt');
+await copyFile('node_modules/stockfish/AUTHORS','public/engine/AUTHORS.txt').catch(() => {});
+console.log(`Prepared ${script}`);
