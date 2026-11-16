@@ -11,6 +11,7 @@ import './interaction.css';
 import './readability.css';
 import { COACHING_MODES, coachingIntensity as savedIntensity, feedbackPolicy } from './coaching-intensity.js';
 import { COACH_QUESTIONS, coachQuestion } from './coach-questions.js';
+import { bestMovePreview } from './best-move-preview.js';
 import { compareMove } from './move-comparison.js';
 import './whatif.css';
 import './mobile-coach.css';
@@ -21,6 +22,7 @@ import './coach-popover.css';
 import './position-editor.css';
 import './coaching-intensity.css';
 import './coach-questions.css';
+import './best-move-preview.css';
 import { moveDraftPiece, editedSession } from './position-editor.js';
 import { placeCoachPopover } from './coach-popover.js';
 import { moveBadge, playableChoices, pieceQualityTarget } from './quick-coach.js';
@@ -175,7 +177,7 @@ function drawBoard() {
   $('#position-editor-bar').hidden=!positionEditor;
   if(positionEditor){$('#position-editor-bar > small').textContent=isFreePlay()?'You control both sides. Choose whose turn comes next.':'You’ll play the selected side. Resume when your setup is ready.';$('#editor-turn').value=positionEditor.turn;$('#editor-undo').disabled=!positionEditor.past.length;$('#editor-resume').textContent=`Resume · ${positionEditor.turn==='w'?'White':'Black'} to play`;}
   const question=coachHelp?.quick&&!preview&&coachHelp?.suggestion?coachQuestion(coachHelp.suggestion,coachHelp.question||'why',playerLevel()):null;
-  const highlights=preview?.coach?previewHighlights(coachHelp?.suggestion,preview.step,playerLevel()):question||{marks:[],lines:[]};
+  const highlights=preview?.bestAlternative?previewHighlights(preview.suggestion,preview.step,playerLevel()):preview?.coach?previewHighlights(coachHelp?.suggestion,preview.step,playerLevel()):question||{marks:[],lines:[]};
   const marked=new Map(highlights.marks.map(m=>[m.square,m]));
   const files = flipped ? 'hgfedcba' : 'abcdefgh', ranks = flipped ? '12345678' : '87654321';
   const freeDrag=canDragToEdit(),draggable=canMoveOnBoard()||freeDrag,dragColor=moveColor();
@@ -221,7 +223,7 @@ function moveExplanationMarkup(attempt) {
   const comparison=compareMove(attempt,playerLevel());
   if(!comparison)return attempt.explanation.facts.map(t=>`<p>${esc(t)}</p>`).join('');
   const c=comparison;
-  return `${c.bestSAN===c.playedSAN?'':c.cause?`<p>${esc(c.cause)}</p>`:`<p>The engine prefers ${esc(c.bestSAN)}. A specific positional reason has not been identified by the current coaching rules.</p>`}<div class="best-move-lesson"><strong>${c.bestSAN===c.playedSAN?'Engine choice':'Best was'} ${esc(c.bestSAN)}</strong><p>${esc(c.bestIdea)}</p></div>${c.cost?`<p class="comparison-cost">${esc(c.cost)}</p>`:''}${c.reply?`<p><strong>Strongest reply:</strong> ${esc(c.reply)}</p>`:''}<details class="move-line-comparison"><summary>Compare engine lines</summary><p><strong>Your move:</strong> ${esc(c.playedLine.join('  '))}</p><p><strong>Alternative:</strong> ${esc(c.bestLine.join('  '))}</p><small>Saved evaluations: ${esc(c.playedScore)} vs ${esc(c.bestScore)} · White’s perspective · depth ${c.depth||'—'}. Evaluation includes position and tactics, not just material. These are example engine continuations; other replies are possible.</small>${c.uncertain?'<p>The precise strategic reason is not yet covered by our rules; the comparison above shows the engine evidence.</p>':''}</details>`;
+  return `${c.bestSAN===c.playedSAN?'':c.cause?`<p>${esc(c.cause)}</p>`:`<p>The engine prefers ${esc(c.bestSAN)}. A specific positional reason has not been identified by the current coaching rules.</p>`}<div class="best-move-lesson"><button class="best-move-preview-trigger" data-best-ply="${attempt.ply}" data-best-uci="${attempt.uci}" aria-label="Preview ${esc(c.bestSAN)} and the opponent’s reply" ${busy||coachHelp?.stage==='loading'?'disabled':''}>${c.bestSAN===c.playedSAN?'Engine choice':'Best was'} <strong>${esc(c.bestSAN)}</strong><span aria-hidden="true"> ↗</span></button><p>${esc(c.bestIdea)}</p></div>${c.cost?`<p class="comparison-cost">${esc(c.cost)}</p>`:''}${c.reply?`<p><strong>Strongest reply:</strong> ${esc(c.reply)}</p>`:''}<details class="move-line-comparison"><summary>Compare engine lines</summary><p><strong>Your move:</strong> ${esc(c.playedLine.join('  '))}</p><p><strong>Alternative:</strong> ${esc(c.bestLine.join('  '))}</p><small>Saved evaluations: ${esc(c.playedScore)} vs ${esc(c.bestScore)} · White’s perspective · depth ${c.depth||'—'}. Evaluation includes position and tactics, not just material. These are example engine continuations; other replies are possible.</small>${c.uncertain?'<p>The precise strategic reason is not yet covered by our rules; the comparison above shows the engine evidence.</p>':''}</details>`;
 }
 function closeGradePopover(restoreFocus=false) {
   const popup=$('#piece-grade-popover');
@@ -289,9 +291,11 @@ function chooseQuickAlternative(delta) {
   arrow=null;selected=null;render();
 }
 function paintMobilePreview() {
-  const suggestion=preview?.coach?coachHelp?.suggestion:preview?.line?{fen:preview.base,pv:preview.line,line:sanLine(preview.base,preview.line,preview.line.length),hint:'Step forward to explore the suggested move and the opponent’s reply.'}:null;
+  const suggestion=preview?.bestAlternative?preview.suggestion:preview?.coach?coachHelp?.suggestion:preview?.line?{fen:preview.base,pv:preview.line,line:sanLine(preview.base,preview.line,preview.line.length),hint:'Step forward to explore the suggested move and the opponent’s reply.'}:null;
   const lesson=suggestion?previewLesson(suggestion,preview.step,playerLevel()):null;
   const card=$('#mobile-preview-coach');card.hidden=!lesson;
+  if(preview?.bestAlternative){$('.play-area').classList.add('coach-preview-active');card.classList.add('best-alternative-card');card.innerHTML=bestPreviewMarkup();return;}
+  card.classList.remove('best-alternative-card');
   $('.play-area').classList.toggle('coach-preview-active',!!lesson);
   if(!lesson){mobilePreviewExpanded=false;card.classList.remove('is-expanded');card.innerHTML='';return;}
   card.classList.toggle('is-expanded',mobilePreviewExpanded);
@@ -433,6 +437,7 @@ function render() {
   if(panelKey!==renderedPanelKey){$('#panel-content').scrollTop=0;renderedPanelKey=panelKey;}
 }
 function renderCoach(active) {
+  if(preview?.bestAlternative && matchMedia('(min-width:901px)').matches){$('#panel-content').innerHTML=`<section class="desktop-best-preview">${bestPreviewMarkup()}</section>`;return;}
   if(coachHelp?.quick&&!preview&&matchMedia('(min-width:901px)').matches){
     $('#panel-content').innerHTML=`<section class="desktop-question-coach"><span class="eyebrow">ASK COACH</span><h2>Let’s look at the board.</h2>${$('#mobile-quick-coach').innerHTML.replaceAll('id="quick-','id="desktop-quick-')}</section>`;return;
   }
@@ -589,6 +594,20 @@ function retryMove() {
   navigateHistory(focus.ply);forkFromHistory();
 }
 function continueGame() { if(busy || !current || current.finished)return; awaiting=false; preview=null; arrow=null; if(game.isGameOver())finishGame(); persist(); render(); if(!current.finished)opponentTurn(); }
+function bestPreviewMarkup() {
+  const p=preview,lesson=previewLesson(p.suggestion,p.step,playerLevel());
+  if(!lesson)return '';
+  return `<div class="best-preview-top"><span class="eyebrow">BEST MOVE PREVIEW · ${p.step}/${p.line.length}</span><button class="button subtle" data-best-return>Return to game ×</button></div><div class="best-preview-heading"><h3>${esc(lesson.heading)}</h3><div><button class="icon-button" data-best-step="-1" aria-label="Previous best-line move" ${p.step<=1?'disabled':''}>←</button><button class="icon-button" data-best-step="1" aria-label="Show opponent’s reply" ${p.step>=p.line.length?'disabled':''}>→</button></div></div><p class="best-preview-reason" role="status">${esc(lesson.reason)}</p>${lesson.actor==='opponent'?`<p class="best-preview-plan"><strong>Possible plan:</strong> ${esc(lesson.plan)}</p>`:''}<small>${p.line.length===1?'No opponent reply in this saved line.':p.step<p.line.length?'Use → to see one engine reply.':'Use ← to revisit the best move.'} Preview only · your moves stay unchanged.</small>`;
+}
+function previewBestMove(ply,uci) {
+  if(busy || !current || preview?.bestAlternative || coachHelp?.stage==='loading')return;
+  const attempt=[...current.attempts].reverse().find(a=>a.ply===ply&&a.uci===uci);
+  const result=bestMovePreview(current,attempt,playerLevel());
+  if(!result){toast('No saved best-move line is available for this decision.');return;}
+  const returnState={preview,coachHelp,focus,tab,mobileCoachView,mobilePreviewExpanded,arrow};
+  closeGradePopover();coachHelp=null;preview={...result,returnState};arrow=null;selected=null;tab='coach';mobileCoachView='coach';render();
+  if(matchMedia('(max-width:900px)').matches){const rect=$('#board').getBoundingClientRect();if(rect.top<0||rect.bottom>innerHeight-240)scrollToSection('board');}
+}
 function showCandidate(index) {
   const line=focus?.lines[index]; if(!line)return;
   preview={fen:focus.before,label:`${sanLine(focus.before,line.pv,1)[0]} · engine variation`,base:focus.before,line:line.pv,step:0};
@@ -600,10 +619,11 @@ function stepPreview(delta) {
   if(preview?.coach){previewCoachMove(preview.step+delta);return;}
   if(!preview?.line)return; preview.step=Math.max(0,Math.min(preview.line.length,preview.step+delta));
   const g=new Chess(preview.base); for(const move of preview.line.slice(0,preview.step))g.move(uciMove(move));
-  preview.fen=g.fen(); const next=preview.line[preview.step]; arrow=next?uciMove(next):null; drawBoard();
+  preview.fen=g.fen();if(preview.bestAlternative){arrow=null;render();return;} const next=preview.line[preview.step]; arrow=next?uciMove(next):null; drawBoard();
   const opening=openingAt(preview.fen);$('#opening-name').textContent=opening?`${opening.eco} · ${opening.name}`:'Engine continuation';
 }
 function returnToGame() {
+  if(preview?.bestAlternative){const saved=preview.returnState;preview=saved.preview;coachHelp=saved.coachHelp;focus=saved.focus;tab=saved.tab;mobileCoachView=saved.mobileCoachView;mobilePreviewExpanded=saved.mobilePreviewExpanded;arrow=saved.arrow;selected=null;render();return;}
   if(preview?.coach){preview=coachHelp?.origin?structuredClone(coachHelp.origin):null;arrow=null;selected=null;render();return;}
   preview=null;arrow=null;selected=null;focus=current?.attempts.at(-1)||null;render();
 }
@@ -795,6 +815,9 @@ window.addEventListener('blur',()=>{if(dragState)releaseDrag({pointerId:dragStat
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b || b.disabled)return;
   if(positionEditor && !['editor-resume','editor-undo','editor-cancel','flip'].includes(b.id)){toast('Resume or cancel your position edits first.');return;}
+  if(b.hasAttribute('data-best-return')){returnToGame();return;}
+  if(b.dataset.bestStep){stepPreview(Number(b.dataset.bestStep));return;}
+  if(b.dataset.bestPly!=null){previewBestMove(Number(b.dataset.bestPly),b.dataset.bestUci);return;}
   if(b.dataset.showFive){tab='coach';mobileCoachView='five';render();return;}
   if(b.dataset.coachView){mobileCoachView=b.dataset.coachView;render();return;}
   if(b.dataset.coachQuestion){if(coachHelp?.suggestion){coachHelp.question=b.dataset.coachQuestion;arrow=null;render();}return;}
