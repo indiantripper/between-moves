@@ -13,6 +13,17 @@ export function coachSuggestion(fen,line,level=1350) {
   const controlled=['d4','e4','d5','e5'].filter(square=>after.attackers(square,move.color).includes(move.to));
   if(controlled.length && !move.captured && !after.isCheck())idea+=` It controls ${controlled.join(' and ')} in the centre.`;
   const hint=before.isCheck()?'Your king is in check. Look for a legal way to escape, block the check or capture the checking piece.':after.isCheckmate()?'Look for a checking move that leaves the king no escape.':move.captured?`Look for a capture of an opponent’s ${PIECE_NAMES[move.captured]}. Check how they can reply.`:move.flags.includes('k')||move.flags.includes('q')?'Can you improve your king’s position and activate a rook in one move?':targets.length?`Can you activate a ${PIECE_NAMES[move.piece]} while putting pressure on an opponent’s piece or pawn?`:controlled.length?'Look for a move that improves your control of the centre.':'Look for a piece whose activity you can improve, and check the opponent’s forcing replies.';
-  return {fen,uci:move.lan,san:move.san,from:move.from,to:move.to,piece:PIECE_NAMES[move.piece],hint,idea,line:sanLine(fen,line.pv,8)};
+  const continuation=new Chess(fen),pv=[];
+  for(const uci of line.pv.slice(0,8)){try{pv.push(continuation.move(uciMove(uci)).lan);}catch{break;}}
+  return {pv,fen,uci:move.lan,san:move.san,from:move.from,to:move.to,piece:PIECE_NAMES[move.piece],hint,idea,line:sanLine(fen,line.pv,8)};
 }
 export function usedCoachHelp(record,fen,ply) { return (record?.hints||[]).some(h=>h.fen===fen && h.ply===ply); }
+
+// Replay a preview on a separate board; never change the practice game.
+export function previewSuggestion(suggestion,step=1) {
+  if(!suggestion?.pv?.length)return null;
+  const position=new Chess(suggestion.fen),count=Math.max(0,Math.min(suggestion.pv.length,Math.trunc(step)));
+  let last=null;
+  try{for(const uci of suggestion.pv.slice(0,count))last=position.move(uciMove(uci));}catch{return null;}
+  return {fen:position.fen(),step:count,last,next:suggestion.pv[count]||null};
+}

@@ -68,3 +68,14 @@
   .panel-tabs{height:38px;min-height:38px}.panel-tabs button{min-height:36px}
   #panel-content{padding:9px 10px 14px}.coach-header{top:0}
 }
+.coach-preview-actions{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.coach-help .coach-preview-actions .button{margin:0;gap:6px;min-height:44px}
+.coach-help .coach-preview-caption{font-size:14px;line-height:1.6;background:#e3ecda;padding:10px;border-radius:6px}
+@media(max-width:900px){.coach-preview-actions .button{flex:1;font-size:13px;padding:8px;white-space:nowrap}}
+@media(max-width:900px){
+  .preview-bar.coach-line{flex-wrap:nowrap;gap:4px}
+  .preview-bar.coach-line>span{display:block;min-width:0;font-size:12px;line-height:1.4}
+  .preview-bar.coach-line>div{flex-wrap:nowrap;flex-shrink:0}
+  .preview-bar.coach-line #exit-preview{font-size:0}
+  .preview-bar.coach-line #exit-preview::after{content:'Return';font-size:12px}
+}

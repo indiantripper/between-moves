@@ -11,7 +11,7 @@ import './interaction.css';
 import './readability.css';
 import './whatif.css';
 import './mobile-coach.css';
-import { coachSuggestion, usedCoachHelp } from './ask-coach.js';
+import { coachSuggestion, usedCoachHelp, previewSuggestion } from './ask-coach.js';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -144,7 +144,7 @@ function drawBoard() {
   const shown = preview ? new Chess(preview.fen) : game;
   const files = flipped ? 'hgfedcba' : 'abcdefgh', ranks = flipped ? '12345678' : '87654321';
   let legal = []; if (selected && !preview?.line) legal = shown.moves({ square:selected,verbose:true }).map(m=>m.to);
-  const last = preview?.historyPly!=null ? positionAt(current,preview.historyPly).history({verbose:true}).at(-1) : !preview ? game.history({verbose:true}).at(-1) : null;
+  const last = preview?.coach ? previewSuggestion(coachHelp?.suggestion,preview.step)?.last : preview?.historyPly!=null ? positionAt(current,preview.historyPly).history({verbose:true}).at(-1) : !preview ? game.history({verbose:true}).at(-1) : null;
   $('#board').innerHTML = [...ranks].map((rank,ri)=>[...files].map((file,fi)=> {
     const square=file+rank, piece=shown.get(square), dark=(file.charCodeAt(0)+Number(rank))%2===0;
     const check = piece?.type==='k' && piece.color===shown.turn() && shown.isCheck();
@@ -153,7 +153,8 @@ function drawBoard() {
   $('#arrow-line').style.display = arrow ? '' : 'none';
   if (arrow) { const a=squarePoint(arrow.from),b=squarePoint(arrow.to); ['x1','y1','x2','y2'].forEach((attr,i)=>$('#arrow-line').setAttribute(attr,[...a,...b][i])); }
   $('#preview-bar').hidden = !preview;
-  if (preview) $('#preview-bar').innerHTML = `<span>${esc(preview.label)}${preview.line ? ` · ${preview.step}/${preview.line.length}`:''}</span><div>${preview.line?'<button class="icon-button" id="line-back" aria-label="Previous variation move">←</button><button class="icon-button" id="line-next" aria-label="Next variation move">→</button>':''}<button class="button subtle" id="exit-preview">${current?.finished?'Back to final position':'Back to game'}</button></div>`;
+  $('#preview-bar').classList.toggle('coach-line',!!preview?.coach);
+  if (preview) $('#preview-bar').innerHTML = `<span>${esc(preview.label)}${preview.line ? ` · ${preview.step}/${preview.line.length}`:''}</span><div>${preview.line?`<button class="icon-button" id="line-back" ${preview.step===0?'disabled':''} aria-label="Previous variation move">←</button><button class="icon-button" id="line-next" ${preview.step>=preview.line.length?'disabled':''} aria-label="Next variation move">→</button>`:''}<button class="button subtle" id="exit-preview">${preview.coach?'Back to my position':current?.finished?'Back to final position':'Back to game'}</button></div>`;
   const ply=preview?.historyPly ?? current?.moves.length ?? 0, total=current?.moves.length || 0;
   $('#history-position').textContent=ply===0?'Starting position':`${Math.ceil(ply/2)}${ply%2?'. White':'… Black'} · ${ply} / ${total}`;
   for(const id of ['history-start','history-back'])$('#'+id).disabled=busy || !current || ply===0;
@@ -180,8 +181,8 @@ function openMobileTools() {
 function coachHelpMarkup() {
   if(!coachHelp)return '';
   const h=coachHelp;
-  let text=h.stage==='loading'?'<h3>Finding a useful move…</h3><p>Analysing the position on your board.</p>':h.stage==='error'?`<h3>Couldn’t analyse this position</h3><p>${esc(h.error)}</p><button class="button secondary" id="coach-retry-help">Try again</button>`:h.stage==='hint'?`<h3>A hint first</h3><p>${esc(h.suggestion.hint)}</p><button class="button primary" id="coach-show-move">Show move + idea</button>`:`<h3>Play ${esc(h.suggestion.san)}</h3><p>Move your ${esc(h.suggestion.piece)} from ${h.suggestion.from} to ${h.suggestion.to}.</p><p>${esc(h.suggestion.idea)}</p><p class="eyebrow">ONE ENGINE CONTINUATION</p><p class="help-line">${esc(h.suggestion.line.join('  '))}</p><small>Depth ${h.depth} · Stockfish 19 Lite. This is one possible line; your opponent can choose another reply.</small>`;
-  return `<section class="coach-help" aria-live="polite"><span class="eyebrow">ASK COACH · ${preview?'DISPLAYED POSITION':'YOUR CURRENT POSITION'}</span>${text}<button class="button subtle" id="coach-dismiss">Dismiss</button><p class="analysis-note">Help marks this decision as assisted, including when coaching is off.</p></section>`;
+  let text=h.stage==='loading'?'<h3>Finding a useful move…</h3><p>Analysing the position on your board.</p>':h.stage==='error'?`<h3>Couldn’t analyse this position</h3><p>${esc(h.error)}</p><button class="button secondary" id="coach-retry-help">Try again</button>`:h.stage==='hint'?`<h3>A hint first</h3><p>${esc(h.suggestion.hint)}</p><button class="button primary" id="coach-show-move">Show move + idea</button>`:`<h3>${preview?.coach?'Preview':'Consider'} ${esc(h.suggestion.san)}</h3><div class="coach-preview-actions"><button class="button secondary" id="coach-preview-move">Preview move</button>${h.suggestion.pv.length>1?'<button class="button secondary" id="coach-preview-reply">Preview reply</button>':''}<button class="button primary" id="coach-play-move" ${canPlayCoachMove()?'':'disabled'}>Play this move</button></div>${coachPreviewCaption()}<p>Move your ${esc(h.suggestion.piece)} from ${h.suggestion.from} to ${h.suggestion.to}.</p><p>${esc(h.suggestion.idea)}</p><p class="eyebrow">ONE ENGINE CONTINUATION</p><p class="help-line">${esc(h.suggestion.line.join('  '))}</p><small>Depth ${h.depth} · Stockfish 19 Lite. This is one possible line; your opponent can choose another reply.</small>`;
+  return `<section class="coach-help" aria-live="polite"><span class="eyebrow">ASK COACH · ${preview?.coach?'BOARD PREVIEW':preview?'DISPLAYED POSITION':'YOUR CURRENT POSITION'}</span>${text}<button class="button subtle" id="coach-dismiss">Dismiss</button><p class="analysis-note">Help marks this decision as assisted, including when coaching is off.</p></section>`;
 }
 async function askCoach() {
   if(!canAskCoach())return;
@@ -190,7 +191,7 @@ async function askCoach() {
   if(coachHelp?.fen===fen && coachHelp.suggestion){render();return;}
   current.hints ||= [];
   if(!usedCoachHelp(current,fen,ply))current.hints.push({fen,ply,created:new Date().toISOString()});
-  const request={fen,gameId:current.id,stage:'loading'};coachHelp=request;render();persist();
+  const request={fen,gameId:current.id,origin:preview?structuredClone(preview):null,stage:'loading'};coachHelp=request;render();persist();
   try {
     const search=await engine.search(fen,{count:1,ms:1100});
     if(coachHelp!==request || current?.id!==request.gameId || shownGame().fen()!==fen)return;
@@ -203,10 +204,39 @@ function revealCoachMove() {
   if(!coachHelp?.suggestion || coachHelp.fen!==shownGame().fen())return;
   coachHelp.stage='answer';arrow=uciMove(coachHelp.suggestion.uci);selected=null;render();
 }
+function coachPreviewCaption() {
+  if(!preview?.coach)return '';
+  const step=preview.step,line=coachHelp.suggestion.line;
+  const caption=step===0?'Your position before the suggestion.':step===1?`Your suggested move: ${line[0]}.`:step===2?`Opponent’s engine reply: ${line[1]}.`:`${step%2?'Your':'Opponent’s'} continuation: ${line[step-1]}.`;
+  return `<p class="coach-preview-caption" role="status">${esc(caption)} Use ← / → below the board to explore. This preview does not play any moves.</p>`;
+}
+function previewCoachMove(step=1) {
+  if(busy || !coachHelp?.suggestion || coachHelp.gameId!==current?.id)return;
+  if(coachHelp.fen!==(preview?.coach?preview.base:shownGame().fen()))return;
+  const result=previewSuggestion(coachHelp.suggestion,step);if(!result)return;
+  preview={coach:true,fen:result.fen,base:coachHelp.fen,line:coachHelp.suggestion.pv,step:result.step,label:result.step===0?'Your position':`${result.step%2?'You':'Reply'}: ${coachHelp.suggestion.line[result.step-1]}`};
+  selected=null;arrow=result.next?uciMove(result.next):null;tab='coach';mobileCoachView='coach';render();
+}
+function canPlayCoachMove() {
+  if(!coachHelp?.suggestion || busy || current?.id!==coachHelp.gameId)return false;
+  if(coachHelp.fen!==(preview?.coach?preview.base:shownGame().fen()))return false;
+  return coachHelp.origin?.historyPly!=null || (!current.finished && game.fen()===coachHelp.fen && game.turn()===current.color);
+}
+function playCoachMove() {
+  if(!canPlayCoachMove())return;
+  const suggestion=coachHelp.suggestion;
+  preview=coachHelp.origin?structuredClone(coachHelp.origin):null;
+  if(preview?.historyPly!=null)forkFromHistory(false);
+  const move=uciMove(suggestion.uci);makeMove(move.from,move.to,move.promotion||'q');
+}
+function dismissCoachHelp() {
+  if(preview?.coach)preview=coachHelp?.origin?structuredClone(coachHelp.origin):null;
+  coachHelp=null;arrow=null;selected=null;render();
+}
 function render() {
   if (!state) return;
   const active = current && !current.finished;
-  if(coachHelp && (coachHelp.fen!==shownGame().fen() || coachHelp.gameId!==current?.id))coachHelp=null;
+  if(coachHelp && (coachHelp.fen!==(preview?.coach?preview.base:shownGame().fen()) || coachHelp.gameId!==current?.id))coachHelp=null;
   $('.side-panel').dataset.coachView=mobileCoachView;
   $('#mobile-ask-coach').disabled=!canAskCoach();
   $('#opponent-name').textContent = current ? `Practice partner · ${current.opponent}` : 'Your practice partner';
@@ -230,7 +260,7 @@ function render() {
   updateMobileDock();
   drawBoard();
   if (tab==='coach') renderCoach(active); else if (tab==='moves') renderMoves(); else renderProgress();
-  const panelKey=`${tab}|${current?.id}|${current?.moves.length}|${focus?.ply}|${focus?.uci}|${coachHelp?.stage}|${mobileCoachView}`;
+  const panelKey=`${tab}|${current?.id}|${current?.moves.length}|${focus?.ply}|${focus?.uci}|${coachHelp?.stage}|${mobileCoachView}|${preview?.coach?preview.step:''}`;
   if(panelKey!==renderedPanelKey){$('#panel-content').scrollTop=0;renderedPanelKey=panelKey;}
 }
 function renderCoach(active) {
@@ -388,12 +418,14 @@ function showCandidate(index) {
   if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
 }
 function stepPreview(delta) {
+  if(preview?.coach){previewCoachMove(preview.step+delta);return;}
   if(!preview?.line)return; preview.step=Math.max(0,Math.min(preview.line.length,preview.step+delta));
   const g=new Chess(preview.base); for(const move of preview.line.slice(0,preview.step))g.move(uciMove(move));
   preview.fen=g.fen(); const next=preview.line[preview.step]; arrow=next?uciMove(next):null; drawBoard();
   const opening=openingAt(preview.fen);$('#opening-name').textContent=opening?`${opening.eco} · ${opening.name}`:'Engine continuation';
 }
 function returnToGame() {
+  if(preview?.coach){preview=coachHelp?.origin?structuredClone(coachHelp.origin):null;arrow=null;selected=null;render();return;}
   preview=null;arrow=null;selected=null;focus=current?.attempts.at(-1)||null;render();
 }
 function navigateHistory(ply) {
@@ -573,7 +605,7 @@ document.addEventListener('click',e=>{
   if(b.dataset.candidate!=null){showCandidate(Number(b.dataset.candidate));return;}
   if(b.dataset.history!=null){viewHistory(Number(b.dataset.history));return;} if(b.dataset.game){openRecord(b.dataset.game);return;}
   if(b.dataset.opponentPly!=null){changeOpponentMove(Number(b.dataset.opponentPly));return;}
-  const actions={ 'ask-coach':askCoach,'mobile-ask-coach':askCoach,'coach-show-move':()=>revealCoachMove(),'coach-dismiss':()=>{coachHelp=null;arrow=null;render();},'coach-retry-help':()=>{coachHelp=null;askCoach();},'mobile-more':openMobileTools,'mobile-game-tools':openMobileTools,'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
+  const actions={ 'ask-coach':askCoach,'mobile-ask-coach':askCoach,'coach-show-move':()=>revealCoachMove(),'coach-preview-move':()=>previewCoachMove(1),'coach-preview-reply':()=>previewCoachMove(2),'coach-play-move':playCoachMove,'coach-dismiss':dismissCoachHelp,'coach-retry-help':()=>{coachHelp=null;askCoach();},'mobile-more':openMobileTools,'mobile-game-tools':openMobileTools,'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
     'exit-preview':returnToGame,'cancel-opponent-edit':returnToGame,'change-opponent':changeOpponentMove,'explain-evaluation':explainEvaluation,'retry-evaluation':()=>{$('#info').close();positionAnalysis.retry(shownGame().fen());},'line-back':()=>stepPreview(-1),'line-next':()=>stepPreview(1),'history-start':()=>navigateHistory(0),'history-back':()=>stepHistory(-1),'history-next':()=>stepHistory(1),'history-live':returnToGame,'play-from-here':forkFromHistory,'show-punishment':showPlayedLine,backup:exportBackup,restore:()=>$('#backup-file').click(),pgn:exportPgn,
     'review-moves':()=>{tab='moves';render();},'review-game':()=>{if(!current||busy)return;finishGame();tab='moves';persist();render();},about:()=>{
       $('#info-body').innerHTML='<h2>A practice room of your own.</h2><p>Between Moves runs chess analysis on your device using Stockfish 19 Lite. Coaching uses programmed rules and verified engine continuations, with no AI API.</p><p>Games, retries, and learning history are stored in this browser using IndexedDB. No accounts, analytics, or game uploads. Your host still handles ordinary website requests.</p><p>Clearing browser data can erase history. Export backups regularly, and before switching domains, browsers, or devices. Import merges sessions without replacing existing records.</p><p>Opponent ratings are approximate targets. Level assessment is an experimental practice-difficulty estimate, not a calibrated platform rating. Positional explanations and practice book lines have limited coverage. Opening recognition uses the local Lichess opening-name database (CC0).</p><p>Stockfish.js is distributed under GPLv3. <a href="https://github.com/nmrugg/stockfish.js/tree/v19.0.1" target="_blank" rel="noreferrer">Engine source</a> · <a href="./engine/COPYING.txt" target="_blank">Engine licence</a>. Chess rules by chess.js (BSD-2-Clause).</p>';
