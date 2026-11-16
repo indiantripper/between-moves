@@ -10,6 +10,7 @@
 .timeline .icon-button{font-size:20px;padding:5px 9px}
 .timeline .icon-button:disabled{cursor:default;opacity:.25}
 #history-position{font-size:10px;color:#79866e;font-variant-numeric:tabular-nums}
+#reset-board{margin-left:auto;font-size:10px;padding:7px 10px;white-space:nowrap}
 #play-from-here{margin-left:auto;font-size:10px;padding:7px 10px;white-space:nowrap;background:#e7eddf;border-color:#d4dfc8;color:#426438}
 .board-note{gap:12px;align-items:flex-start;line-height:1.7;border-top:0}
 #opening-name{flex:1;font-size:11px;font-weight:650;color:#41613d}
