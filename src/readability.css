@@ -2,19 +2,19 @@
 :root{--reading-text:#405a49;--secondary-text:#65735e}
 html{scroll-padding-top:20px}
 body{font-size:16px}
-main{max-width:1440px;padding:28px 40px 0}
-.masthead{height:82px;gap:30px}
-.page-heading{margin-bottom:25px}
-.page-heading h1{font-size:34px;letter-spacing:-1px}
+main{max-width:1340px;padding:36px 60px 0}
+.masthead{height:99px;gap:55px}
+.page-heading{margin-bottom:30px}
+.page-heading h1{font-size:clamp(27px,3vw,40px);letter-spacing:-1.6px}
 .page-heading p{font-size:15px;color:var(--secondary-text)}
 .eyebrow{font-size:11px;letter-spacing:1.25px;color:#65705b;line-height:1.6}
 .nav-link{font-size:15px}
 .button{font-size:14px;min-height:44px;padding:10px 15px}
 .icon-button{min-width:44px;min-height:44px}
-.workspace{grid-template-columns:clamp(320px,calc(100dvh - 320px),620px) minmax(400px,600px);gap:32px;justify-content:center;align-items:start}
-.play-area{position:sticky;top:20px;width:100%;max-width:660px;scroll-margin-top:16px}
+.workspace{grid-template-columns:minmax(0,1.28fr) minmax(340px,1fr);gap:36px;align-items:start}
+.play-area{position:static;width:100%;max-width:none;scroll-margin-top:16px}
 .board{container-type:inline-size}
-.board .piece{font-size:clamp(24px,10cqw,64px)}
+.board .piece{font-size:clamp(24px,10cqw,62px)}
 .drag-ghost .piece{font-size:1em}
 .player-bar{height:auto;min-height:48px;gap:10px}
 .player-bar strong{font-size:14px;line-height:1.4}
@@ -32,7 +32,7 @@ main{max-width:1440px;padding:28px 40px 0}
 #book-status{font-size:12px;color:var(--secondary-text);line-height:1.6}
 .board-note{flex-direction:column;gap:5px;padding:12px 0}
 #book-status{text-align:left}
-.side-panel{min-height:0;overflow:visible;scroll-margin-top:15px}
+.side-panel{min-height:665px;overflow:visible;scroll-margin-top:15px}
 .panel-tabs{height:58px;gap:28px;padding:0 24px;background:#fffefa;border-radius:10px 10px 0 0}
 .panel-tabs button{font-size:14px;min-height:44px;color:#66715d}
 #panel-content{padding:24px}
@@ -111,10 +111,16 @@ footer{gap:15px;flex-wrap:wrap;font-size:12px;line-height:1.6}
 footer button{font-size:13px;min-height:44px;color:#556c49}
 .mobile-dock{display:none}
 #toast{font-size:14px;line-height:1.6}
-@media(max-width:1200px) and (min-width:901px){
-  main{padding:25px 28px 0}
-  .workspace{grid-template-columns:minmax(0,1fr) minmax(360px,1fr);gap:24px}
-  .play-area{max-width:clamp(320px,calc(100dvh - 320px),620px);justify-self:center}
+@media(min-width:1450px){main{padding-top:45px}.side-panel{min-height:690px}}
+@media(min-width:901px){
+  .side-panel{display:flex;flex-direction:column;position:sticky;top:16px;height:min(665px,calc(100dvh - 32px));min-height:0}
+  .panel-tabs{flex-shrink:0}
+  #panel-content{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;border-radius:0 0 10px 10px}
+}
+@media(min-width:1450px){.side-panel{height:min(690px,calc(100dvh - 32px))}}
+@media(max-width:1050px) and (min-width:901px){
+  main{padding:30px 30px 0}
+  .workspace{grid-template-columns:minmax(0,1.2fr) minmax(300px,1fr);gap:22px}
   #panel-content{padding:20px}
   .panel-tabs{padding:0 20px;gap:24px}
   .bottom-player{flex-wrap:wrap}
@@ -132,7 +138,7 @@ footer button{font-size:13px;min-height:44px;color:#556c49}
   .page-heading{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
   .workspace{grid-template-columns:minmax(0,1fr);gap:18px}
   .play-area{position:static;width:100%;max-width:580px;margin:auto;scroll-margin-top:12px}
-  .side-panel{width:100%;max-width:580px;margin:auto;scroll-margin-top:12px}
+  .side-panel{width:100%;max-width:580px;min-height:0;margin:auto;scroll-margin-top:12px}
   .player-bar{min-height:44px;margin-bottom:10px}
   .player-bar strong{font-size:14px}
   .player-bar small{font-size:12px}

@@ -5,13 +5,13 @@ export function parseInfo(line) {
   return { index:Number(line.match(/\bmultipv (\d+)/)?.[1] || 1), depth:Number(line.match(/\bdepth (\d+)/)?.[1] || 0), [score[1]]:Number(score[2]), pv };
 }
 export class Engine {
-  constructor(url) {
+  constructor(url,{hash=32}={}) {
     this.worker = new Worker(url); this.queue = Promise.resolve(); this.listeners = new Set();
     this.worker.onmessage = e => String(e.data).split('\n').forEach(line => this.listeners.forEach(fn => fn(line)));
     this.ready = new Promise((resolve,reject) => {
       const timer = setTimeout(() => reject(Error('The chess engine could not start. Reload to try again.')),25000);
       this.worker.onerror = () => { clearTimeout(timer); reject(Error('The chess engine could not load. Check your connection and reload.')); };
-      const onLine = line => { if (line === 'uciok') { clearTimeout(timer); this.listeners.delete(onLine); this.send('setoption name Hash value 32'); resolve(); } };
+      const onLine = line => { if (line === 'uciok') { clearTimeout(timer); this.listeners.delete(onLine); this.send(`setoption name Hash value ${hash}`); resolve(); } };
       this.listeners.add(onLine); this.send('uci');
     });
   }

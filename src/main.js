@@ -3,10 +3,12 @@ import { Engine } from './engine.js';
 import { OPENINGS, chooseOpening, bookOptions, bookStatus, identifyOpening, openingAt, openingForMove } from './openings.js';
 import { PIECE_NAMES, uciMove, displayScore, gradeMove, explainMove, explainCandidate, sanLine, learningSummary } from './coach.js';
 import { openStore, readState, writeState, validateBackup } from './storage.js';
-import { positionAt, forkSession } from './timeline.js';
+import { positionAt, forkSession, opponentMoveAt, replaceOpponentLine } from './timeline.js';
+import { positionEvaluation, LatestPositionAnalysis } from './evaluation.js';
 import './style.css';
 import './interaction.css';
 import './readability.css';
+import './whatif.css';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -16,7 +18,14 @@ let coachOn = true, awaiting = false, retrying = false, focus = null, preview = 
 let tab = 'coach', generation = 0, flipped = false, toastTimer, saveQueue = Promise.resolve();
 let dragState=null, suppressClickUntil=0;
 let mobileDestination='board';
+let renderedPanelKey=null;
 const engine = new Engine(`${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`);
+let meterEngine=null;
+const positionAnalysis=new LatestPositionAnalysis(async fen=>{
+  meterEngine ||= new Engine(`${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`,{hash:16});
+  const result=await meterEngine.search(fen,{count:1,ms:650});
+  return {line:result.lines[0],depth:result.depth};
+},()=>paintEvaluation());
 engine.ready.then(() => { engineReady = true; busy = false; render(); resumeSession(); }).catch(handleError);
 
 $('#app').innerHTML = `
@@ -26,9 +35,11 @@ $('#app').innerHTML = `
   <main><div class="page-heading"><div><div class="eyebrow">A LITTLE BETTER, EVERY MOVE</div><h1>Make your next move count.</h1><p>A worthy opponent. A thoughtful coach. Your own pace.</p></div><span class="local-badge"><span></span> Saved on this device</span></div>
     <div class="workspace"><section class="play-area" aria-label="Chess game">
       <div class="player-bar"><div class="avatar opponent-avatar">♞</div><div><strong id="opponent-name">Your practice partner</strong><small id="opponent-caption">Getting the board ready</small></div><span id="engine-status" class="status-pill">Loading engine…</span></div>
+      <div id="opponent-edit-bar" class="opponent-edit-bar" role="status" hidden></div>
       <div class="board-shell"><div class="board" id="board" role="group" aria-label="Chessboard"></div><svg id="arrows" class="arrows" viewBox="0 0 800 800" aria-hidden="true"><defs><marker id="arrowhead" markerWidth="4" markerHeight="4" refX="2.5" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4" fill="#d78d2a"/></marker></defs><line id="arrow-line" stroke="#d78d2a" stroke-opacity=".86" stroke-width="12" stroke-linecap="round" marker-end="url(#arrowhead)" /></svg></div>
+      <section id="evaluation-panel" class="evaluation-panel" aria-label="Position evaluation" hidden><div class="evaluation-scale"><span>White</span><div id="evaluation-track" class="evaluation-track" role="img" aria-label="Analysing position"><span id="white-advantage"></span></div><span>Black</span></div><div class="evaluation-caption"><strong id="evaluation-score">—</strong><span id="evaluation-headline">Analysing position…</span><button class="button subtle" id="explain-evaluation">Why?</button></div></section>
       <div class="player-bar bottom-player"><div class="avatar you-avatar">♙</div><div><strong>You <span id="your-color"></span></strong><small id="your-caption">Your practice, your pace</small></div><button class="icon-button" id="flip" aria-label="Flip board" title="Flip board">⇅</button><button class="button subtle" id="review-game">Review game</button></div>
-      <div class="timeline" aria-label="Game navigation"><div class="timeline-buttons"><button class="icon-button" id="history-start" aria-label="Go to start" title="Go to start">⇤</button><button class="icon-button" id="history-back" aria-label="Previous move" title="Previous move (left arrow)">←</button><button class="icon-button" id="history-next" aria-label="Next move" title="Next move (right arrow)">→</button><button class="icon-button" id="history-live" aria-label="Go to latest position" title="Go to latest position">⇥</button></div><span id="history-position">Starting position</span><button class="button subtle" id="reset-board" title="Restart this practice with the same settings">Reset board</button><button class="button subtle" id="play-from-here" hidden>Play from here ↗</button></div>
+      <div class="timeline" aria-label="Game navigation"><div class="timeline-buttons"><button class="icon-button" id="history-start" aria-label="Go to start" title="Go to start">⇤</button><button class="icon-button" id="history-back" aria-label="Previous move" title="Previous move (left arrow)">←</button><button class="icon-button" id="history-next" aria-label="Next move" title="Next move (right arrow)">→</button><button class="icon-button" id="history-live" aria-label="Go to latest position" title="Go to latest position">⇥</button></div><span id="history-position">Starting position</span><button class="button subtle" id="reset-board" title="Restart this practice with the same settings">Reset board</button><button class="button subtle" id="change-opponent">Change opponent move</button><button class="button subtle" id="play-from-here" hidden>Play from here ↗</button></div>
       <div id="preview-bar" class="preview-bar" hidden></div>
       <div class="board-note"><span id="opening-name">Opening practice</span><span id="book-status">Choose your opening</span></div>
     </section>
@@ -56,6 +67,42 @@ function persist() {
   return saveQueue;
 }
 function historyGame(record = current) { const g = new Chess(); for (const move of record?.moves || []) g.move(uciMove(move)); return g; }
+function shownGame() { return preview?.historyPly!=null?positionAt(current,preview.historyPly):preview?new Chess(preview.fen):game; }
+function moveColor() { return preview?.opponentEdit?shownGame().turn():current?.color; }
+function opponentTarget() { return !current || preview?.line || preview?.opponentEdit?null:opponentMoveAt(current,preview?.historyPly ?? current.moves.length); }
+function evaluationVisible() { return !!current && (coachOn || current.finished); }
+function evaluationState() {
+  const shown=shownGame(),state=positionAnalysis.state?.fen===shown.fen()?positionAnalysis.state:null;
+  return {shown,state,model:positionEvaluation(shown,state?.analysis)};
+}
+function paintEvaluation() {
+  if(!state || !evaluationVisible())return;
+  const {state:analysis,model}=evaluationState();
+  if(analysis?.error && !model.terminal)model.headline='Evaluation unavailable';
+  $('#evaluation-score').textContent=model.score;
+  $('#evaluation-headline').textContent=model.headline;
+  $('#white-advantage').style.width=`${model.whiteShare}%`;
+  $('#evaluation-track').classList.toggle('is-pending',!model.terminal && !analysis?.analysis);
+  $('#evaluation-track').setAttribute('aria-label',`${model.headline}. ${model.score==='—'?'':`Evaluation ${model.score} from White’s perspective.`}`);
+  $('#explain-evaluation').disabled=busy || (!model.terminal && (!analysis || analysis.loading));
+}
+function syncEvaluation() {
+  const visible=evaluationVisible();$('#evaluation-panel').hidden=!visible;
+  if(!visible){positionAnalysis.pause();return;}
+  const shown=shownGame();
+  if(shown.isGameOver())positionAnalysis.pause();
+  else if(engineReady)positionAnalysis.request(shown.fen());
+  paintEvaluation();
+}
+function explainEvaluation() {
+  const {shown,state:analysis,model}=evaluationState();
+  if(!model.terminal && analysis?.error){
+    $('#info-body').innerHTML=`<div class="eval-explanation"><h2>Evaluation unavailable</h2><p>The position has not been scored. You can keep playing or try the analysis again.</p><button id="retry-evaluation" class="button primary">Retry evaluation</button></div>`;
+  }else{
+    $('#info-body').innerHTML=`<div class="eval-explanation"><span class="eyebrow">THE POSITION ON YOUR BOARD</span><h2>${esc(model.headline)}</h2><p class="eval-large-score">${esc(model.score)}</p>${model.facts.map(f=>`<p>${esc(f)}</p>`).join('')}${model.line.length?`<h3>Engine continuation</h3><p class="eval-line">${esc(model.line.join('  '))}</p>`:''}<p class="analysis-note">${model.terminal?'Game result.':`Stockfish 19 Lite · depth ${model.depth || '—'}. Positive scores favour White; negative scores favour Black. A score of +1.00 is roughly a pawn’s worth of overall advantage, which can come from position or tactics as well as material. The bar is a visual scale of advantage, not a win probability. Rankings can change with deeper analysis.`}</p></div>`;
+  }
+  $('#info').showModal();
+}
 function getOpening() { return OPENINGS.find(o=>o.id === current?.opening); }
 function playerLevel() { return current?.level || state?.settings.level || 1350; }
 function squarePoint(square) {
@@ -94,7 +141,14 @@ function drawBoard() {
   for(const id of ['history-next','history-live'])$('#'+id).disabled=busy || !current || ply>=total;
   $('#history-live').disabled=busy || !current || !preview;
   $('#play-from-here').hidden=preview?.historyPly==null;
+  if(preview?.opponentEdit)$('#play-from-here').hidden=true;
   $('#play-from-here').disabled=busy || shown.isGameOver();
+  const target=opponentTarget();
+  $('#change-opponent').disabled=busy || !engineReady || !target;
+  $('#change-opponent').title=target?`Try an alternative to ${Math.floor(target.ply/2)+1}${target.color==='w'?'.':'…'} ${target.san}`:'Select an opponent move in Moves, or wait for the opponent to play.';
+  $('#opponent-edit-bar').hidden=!preview?.opponentEdit;
+  if(preview?.opponentEdit)$('#opponent-edit-bar').innerHTML=`<div><strong>What if ${shown.turn()==='w'?'White':'Black'} played something else?</strong><p>Drag an opponent piece to replace <b>${esc(preview.opponentEdit.san)}</b>. Your original game stays saved.</p></div><button class="button subtle" id="cancel-opponent-edit">Cancel</button>`;
+  syncEvaluation();
 }
 function render() {
   if (!state) return;
@@ -103,7 +157,7 @@ function render() {
   $('#opponent-caption').textContent = current ? `${current.color==='w'?'Black':'White'} · target strength` : 'Ready when you are';
   $('#your-color').textContent = current ? `· ${current.color==='w'?'White':'Black'}` : '';
   $('#your-caption').textContent = current?.assess ? 'Assessment · unassisted moves count' : `Teaching level ${playerLevel()}`;
-  $('#engine-status').textContent = !engineReady ? 'Loading engine…' : busy ? 'Thinking…' : preview ? 'Exploring' : current?.finished ? 'Review' : awaiting ? 'Your decision' : !current ? 'Ready to play' : game.turn()===current.color ? 'Your turn' : 'Opponent’s turn';
+  $('#engine-status').textContent = !engineReady ? 'Loading engine…' : busy ? 'Thinking…' : preview?.opponentEdit ? 'What-if move' : preview ? 'Exploring' : current?.finished ? 'Review' : awaiting ? 'Your decision' : !current ? 'Ready to play' : game.turn()===current.color ? 'Your turn' : 'Opponent’s turn';
   const displayedGame=preview?.historyPly!=null ? positionAt(current,preview.historyPly) : game;
   const recognised=preview?.line ? openingAt(preview.fen) : identifyOpening(displayedGame);
   $('#opening-name').textContent = recognised ? `${recognised.eco} · ${recognised.name}` : 'Opening not yet identified';
@@ -116,6 +170,8 @@ function render() {
   updateMobileDock();
   drawBoard();
   if (tab==='coach') renderCoach(active); else if (tab==='moves') renderMoves(); else renderProgress();
+  const panelKey=`${tab}|${current?.id}|${current?.moves.length}|${focus?.ply}|${focus?.uci}`;
+  if(panelKey!==renderedPanelKey){$('#panel-content').scrollTop=0;renderedPanelKey=panelKey;}
 }
 function renderCoach(active) {
   const f=focus;
@@ -136,7 +192,8 @@ function renderCoach(active) {
   }
   if(current && coachOn && !preview){
     const last=game.history({verbose:true}).at(-1);
-    if(last && last.color!==current.color)html+=`<div class="opponent-reply"><span class="eyebrow">OPPONENT’S REPLY</span><strong>${esc(last.san)}</strong><p>${game.isCheck()?'Your king is in check. You must deal with the check.':last.captured?`Your opponent captured your ${PIECE_NAMES[last.captured]} on ${last.to}.`:'Look at what changed. You can rewind as many moves as you like and try a different continuation.'}</p></div>`;
+    const manual=current.overrides?.find(o=>o.ply===current.moves.length-1&&o.uci===last?.lan);
+    if(last && last.color!==current.color)html+=`<div class="opponent-reply"><span class="eyebrow">${manual?'YOUR WHAT-IF REPLY':'OPPONENT’S REPLY'}</span><strong>${esc(last.san)}</strong>${manual?`<p>You chose ${esc(last.san)} instead of ${esc(manual.replacedSan)}. It’s your turn to respond.</p>`:''}<p>${game.isCheck()?'Your king is in check. You must deal with the check.':last.captured?`Your opponent captured your ${PIECE_NAMES[last.captured]} on ${last.to}.`:'Look at what changed. You can rewind as many moves as you like and try a different continuation.'}</p></div>`;
   }
   const summary=learningSummary(state.games), pattern=summary.patterns.find(p=>p.count>=2);
   if(coachOn || !active) html+=`<div class="habit-card"><span class="habit-icon">✦</span><div><span class="eyebrow">${pattern?'A PATTERN TO NOTICE':'ONE SMALL HABIT'}</span><p>${esc(pattern?.tip || 'Before you move, ask: what is my opponent threatening?')}</p></div></div>`;
@@ -147,7 +204,7 @@ function renderMoves() {
   if (!current) { $('#panel-content').innerHTML='<div class="coach-empty"><h3>Your story starts on move one.</h3><p>Start a practice to build your move history.</p></div>'; return; }
   const history=historyGame().history({verbose:true});
   let html=`<div class="panel-intro"><span class="eyebrow">${current.finished?'POST-GAME REVIEW':'YOUR GAME SO FAR'}</span><h2>Every move has a story.</h2><p>Select a move to revisit its position. Use the board arrows to go back further, then Play from here to test another line. Your original game is preserved.</p></div><div class="move-table"><div class="move-table-head"><span>#</span><span>WHITE</span><span>BLACK</span></div>`;
-  for(let i=0;i<history.length;i+=2) html+=`<div class="move-row"><span>${i/2+1}</span>${[i,i+1].map(j=>{const m=history[j]; if(!m)return '<span></span>'; const a=[...(current.attempts||[])].reverse().find(a=>a.ply===j && a.uci===m.lan); return `<button data-history="${j}" class="${a?.grade.severity>=2?'bad-move':''}">${esc(m.san)} <small>${a?.grade.severity>=2?'?':a?.grade.label==='Best move'?'✓':''}</small></button>`;}).join('')}</div>`;
+  for(let i=0;i<history.length;i+=2) html+=`<div class="move-row"><span>${i/2+1}</span>${[i,i+1].map(j=>{const m=history[j]; if(!m)return '<span></span>'; const a=[...(current.attempts||[])].reverse().find(a=>a.ply===j && a.uci===m.lan); const manual=current.overrides?.some(o=>o.ply===j&&o.uci===m.lan); return `<div class="move-cell"><button data-history="${j}" class="${a?.grade.severity>=2?'bad-move':''}">${esc(m.san)} <small>${manual?'↳':a?.grade.severity>=2?'?':a?.grade.label==='Best move'?'✓':''}</small></button>${m.color!==current.color?`<button class="move-override" data-opponent-ply="${j}" aria-label="Change opponent move ${Math.floor(j/2)+1}${m.color==='w'?'.':'…'} ${esc(m.san)}" title="Try a different opponent move" ${busy?'disabled':''}>↺</button>`:''}</div>`;}).join('')}</div>`;
   html+='</div>';
   if (!history.length) html+='<p class="muted panel-intro">Make your first move to begin.</p>';
   if (current.finished) {
@@ -227,10 +284,10 @@ async function makeMove(from,to,promotion='q',recovered=null) {
     if(game.isGameOver()){finishGame(terminalResult());persist();render();}else opponentTurn();
   }
 }
-function choosePromotion(from,to) {
+function choosePromotion(from,to,onMove=makeMove) {
   const dialog=$('#promotion'); $('.promotion-options').innerHTML=['q','r','b','n'].map(p=>`<button class="promotion-choice" data-promotion="${p}" aria-label="Promote to ${PIECE_NAMES[p]}">${glyphs[p]}</button>`).join('');
   dialog.oncancel=()=>{selected=null;drawBoard();};
-  $('.promotion-options').onclick=e=>{ const p=e.target.closest('[data-promotion]')?.dataset.promotion; if(p){dialog.close();makeMove(from,to,p);} }; dialog.showModal();
+  $('.promotion-options').onclick=e=>{ const p=e.target.closest('[data-promotion]')?.dataset.promotion; if(p){dialog.close();onMove(from,to,p);} }; dialog.showModal();
 }
 async function opponentTurn() {
   if(!current || current.finished || game.turn()===current.color || busy) return;
@@ -283,6 +340,30 @@ function navigateHistory(ply) {
   render();
 }
 function stepHistory(delta) { navigateHistory((preview?.historyPly ?? current?.moves.length ?? 0)+delta); }
+function changeOpponentMove(ply=null) {
+  if(busy || !engineReady || !current)return;
+  const target=ply==null?opponentTarget():historyGame().history({verbose:true})[ply];
+  if(!target || target.color===current.color)return;
+  const index=ply==null?target.ply:ply;
+  preview={fen:target.before,historyPly:index,opponentEdit:{ply:index,san:target.san,uci:target.lan},label:`Choose an alternative to ${Math.floor(index/2)+1}${target.color==='w'?'.':'…'} ${target.san}`};
+  selected=null;arrow=null;render();
+  if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
+}
+async function applyOpponentReplacement(from,to,promotion=null) {
+  if(busy || !preview?.opponentEdit)return;
+  const legal=shownGame().moves({square:from,verbose:true}).filter(m=>m.to===to);
+  if(!legal.length){selected=null;drawBoard();return;}
+  if(legal.some(m=>m.promotion) && !promotion){choosePromotion(from,to,applyOpponentReplacement);return;}
+  try {
+    const edit=preview.opponentEdit;
+    const branch=replaceOpponentLine(current,edit.ply,`${from}${to}${promotion||''}`,crypto.randomUUID());
+    current=branch;state.games.push(branch);state.active=branch.id;game=historyGame();generation++;
+    coachOn=branch.coach??true;awaiting=false;retrying=true;preview=null;arrow=null;selected=null;focus=branch.attempts.at(-1)||null;tab='coach';
+    if(game.isGameOver())finishGame(terminalResult());
+    await persist();render();toast(`What if ${branch.overrides.at(-1).san}? Your original game is saved. It’s your turn to respond.`);
+    if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
+  }catch(error){toast(error.message);}
+}
 function forkFromHistory(autoReply=true) {
   if(busy || preview?.historyPly==null || new Chess(preview.fen).isGameOver())return;
   const branch=forkSession(current,preview.historyPly,crypto.randomUUID());
@@ -351,6 +432,7 @@ function resumeSession() {
 $('#setup-form').addEventListener('submit',startGame);
 function canMoveOnBoard() {
   if(busy || !current || preview?.line)return false;
+  if(preview?.opponentEdit)return !shownGame().isGameOver();
   if(preview?.historyPly!=null)return new Chess(preview.fen).turn()===current.color;
   return !current.finished && game.turn()===current.color;
 }
@@ -358,6 +440,7 @@ function playBoardMove(from,to) {
   if(!canMoveOnBoard())return;
   const shown=preview?new Chess(preview.fen):game;
   if(!shown.moves({square:from,verbose:true}).some(m=>m.to===to)){selected=null;drawBoard();return;}
+  if(preview?.opponentEdit){applyOpponentReplacement(from,to);return;}
   if(preview?.historyPly!=null)forkFromHistory(false);
   makeMove(from,to);
 }
@@ -367,14 +450,14 @@ $('#board').addEventListener('click',e=>{
   if(!square || !canMoveOnBoard())return;
   const shown=preview?new Chess(preview.fen):game;
   if(selected && shown.moves({square:selected,verbose:true}).some(m=>m.to===square)){playBoardMove(selected,square);return;}
-  selected=shown.get(square)?.color===current.color ? (selected===square?null:square) : null;drawBoard();
+  selected=shown.get(square)?.color===moveColor() ? (selected===square?null:square) : null;drawBoard();
 });
 $('#board').addEventListener('dragstart',e=>e.preventDefault());
 $('#board').addEventListener('pointerdown',e=>{
   if(e.button!==0 || !canMoveOnBoard())return;
   const from=e.target.closest('[data-square]')?.dataset.square;
   const shown=preview?new Chess(preview.fen):game,piece=from?shown.get(from):null;
-  if(piece?.color!==current.color)return;
+  if(piece?.color!==moveColor())return;
   dragState={from,piece,pointerId:e.pointerId,x:e.clientX,y:e.clientY,active:false};
 });
 document.addEventListener('pointermove',e=>{
@@ -386,7 +469,7 @@ document.addEventListener('pointermove',e=>{
     const ghost=document.createElement('div');ghost.id='drag-piece';ghost.className='drag-ghost';
     ghost.innerHTML=`<span class="piece ${dragState.piece.color==='w'?'white':'black'}">${glyphs[dragState.piece.type]}</span>`;
     const boardWidth=$('#board').getBoundingClientRect().width;
-    ghost.style.width=`${boardWidth/8}px`;ghost.style.fontSize=`${boardWidth/10}px`;document.body.append(ghost);
+    ghost.style.width=`${boardWidth/8}px`;ghost.style.fontSize=`${Math.max(24,Math.min(62,boardWidth/10))}px`;document.body.append(ghost);
   }
   const ghost=$('#drag-piece');ghost.style.left=`${e.clientX}px`;ghost.style.top=`${e.clientY}px`;
   document.querySelector('.drop-target')?.classList.remove('drop-target');
@@ -419,8 +502,9 @@ document.addEventListener('click',e=>{
   if(b.dataset.tab){tab=b.dataset.tab;mobileDestination=tab;render();return;} if(b.dataset.panel){tab=b.dataset.panel;mobileDestination=tab;render();return;}
   if(b.dataset.candidate!=null){showCandidate(Number(b.dataset.candidate));return;}
   if(b.dataset.history!=null){viewHistory(Number(b.dataset.history));return;} if(b.dataset.game){openRecord(b.dataset.game);return;}
+  if(b.dataset.opponentPly!=null){changeOpponentMove(Number(b.dataset.opponentPly));return;}
   const actions={ 'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
-    'exit-preview':returnToGame,'line-back':()=>stepPreview(-1),'line-next':()=>stepPreview(1),'history-start':()=>navigateHistory(0),'history-back':()=>stepHistory(-1),'history-next':()=>stepHistory(1),'history-live':returnToGame,'play-from-here':forkFromHistory,'show-punishment':showPlayedLine,backup:exportBackup,restore:()=>$('#backup-file').click(),pgn:exportPgn,
+    'exit-preview':returnToGame,'cancel-opponent-edit':returnToGame,'change-opponent':changeOpponentMove,'explain-evaluation':explainEvaluation,'retry-evaluation':()=>{$('#info').close();positionAnalysis.retry(shownGame().fen());},'line-back':()=>stepPreview(-1),'line-next':()=>stepPreview(1),'history-start':()=>navigateHistory(0),'history-back':()=>stepHistory(-1),'history-next':()=>stepHistory(1),'history-live':returnToGame,'play-from-here':forkFromHistory,'show-punishment':showPlayedLine,backup:exportBackup,restore:()=>$('#backup-file').click(),pgn:exportPgn,
     'review-moves':()=>{tab='moves';render();},'review-game':()=>{if(!current||busy)return;finishGame();tab='moves';persist();render();},about:()=>{
       $('#info-body').innerHTML='<h2>A practice room of your own.</h2><p>Between Moves runs chess analysis on your device using Stockfish 19 Lite. Coaching uses programmed rules and verified engine continuations, with no AI API.</p><p>Games, retries, and learning history are stored in this browser using IndexedDB. No accounts, analytics, or game uploads. Your host still handles ordinary website requests.</p><p>Clearing browser data can erase history. Export backups regularly, and before switching domains, browsers, or devices. Import merges sessions without replacing existing records.</p><p>Opponent ratings are approximate targets. Level assessment is an experimental practice-difficulty estimate, not a calibrated platform rating. Positional explanations and practice book lines have limited coverage. Opening recognition uses the local Lichess opening-name database (CC0).</p><p>Stockfish.js is distributed under GPLv3. <a href="https://github.com/nmrugg/stockfish.js/tree/v19.0.1" target="_blank" rel="noreferrer">Engine source</a> · <a href="./engine/COPYING.txt" target="_blank">Engine licence</a>. Chess rules by chess.js (BSD-2-Clause).</p>';
       $('#info').showModal();
