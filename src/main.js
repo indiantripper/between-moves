@@ -13,6 +13,8 @@ import './whatif.css';
 import './mobile-coach.css';
 import './mobile-page.css';
 import './mobile-preview.css';
+import './mobile-quick.css';
+import { moveBadge, playableChoices } from './quick-coach.js';
 import { moveCaption } from './move-caption.js';
 import { previewHighlights } from './coach-highlights.js';
 import { coachSuggestion, usedCoachHelp, previewSuggestion, previewLesson } from './ask-coach.js';
@@ -26,6 +28,7 @@ let tab = 'coach', generation = 0, flipped = false, toastTimer, saveQueue = Prom
 let dragState=null, suppressClickUntil=0;
 let mobileDestination='board';
 let renderedPanelKey=null;
+let mobileGradeOpen=false, mobileGradeKey=null;
 let coachHelp=null, mobileCoachView='coach', mobilePreviewExpanded=false;
 const engine = new Engine(`${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`);
 let meterEngine=null;
@@ -45,6 +48,7 @@ $('#app').innerHTML = `
       <div class="player-bar"><div class="avatar opponent-avatar">♞</div><div><strong id="opponent-name">Your practice partner</strong><small id="opponent-caption">Getting the board ready</small></div><span id="engine-status" class="status-pill">Loading engine…</span></div>
       <div id="opponent-edit-bar" class="opponent-edit-bar" role="status" hidden></div>
       <div class="board-shell"><div class="board" id="board" role="group" aria-label="Chessboard"></div><svg id="arrows" class="arrows" viewBox="0 0 800 800" aria-hidden="true"><defs><marker id="arrowhead" markerWidth="4" markerHeight="4" refX="2.5" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4" fill="#d78d2a"/></marker></defs><g id="coach-board-lines"></g><line id="arrow-line" stroke="#d78d2a" stroke-opacity=".86" stroke-width="12" stroke-linecap="round" marker-end="url(#arrowhead)" /></svg></div>
+      <section class="mobile-glance" id="mobile-glance" aria-label="Quick coaching"><div class="mobile-glance-row"><button id="mobile-move-grade" class="mobile-grade-button" aria-expanded="false" aria-controls="mobile-grade-explanation"></button><button id="mobile-best-move" class="mobile-best-button" aria-label="Show best move and playable alternatives"><span aria-hidden="true">✦</span><span>Best move</span></button></div><div id="mobile-grade-explanation" hidden></div><div id="mobile-quick-coach" aria-live="polite" hidden></div></section>
       <section id="mobile-preview-coach" class="mobile-preview-coach" aria-label="Current preview explanation" aria-live="polite" aria-atomic="true" hidden></section>
       <section id="evaluation-panel" class="evaluation-panel" aria-label="Position evaluation" hidden><div class="evaluation-scale"><span>White</span><div id="evaluation-track" class="evaluation-track" role="img" aria-label="Analysing position"><span id="white-advantage"></span></div><span>Black</span></div><div class="evaluation-caption"><strong id="evaluation-score">—</strong><span id="evaluation-headline">Analysing position…</span><button class="button subtle" id="explain-evaluation">Why?</button></div></section>
       <div class="mobile-position" id="mobile-move-names" aria-live="polite">Starting position</div>
@@ -57,7 +61,7 @@ $('#app').innerHTML = `
     <aside class="side-panel"><div class="panel-tabs"><button class="active" data-panel="coach">Coach</button><button class="mobile-top-five" data-show-five="true">Top 5</button><button data-panel="moves">Moves</button><button data-panel="progress"><span class="desktop-progress-label">My progress</span><span class="mobile-progress-label">Progress</span></button></div><div id="panel-content"></div></aside></div>
     <footer><span>Think first. Understand next. Keep growing.</span><button id="backup">Export backup</button><button id="restore">Import backup</button><button id="pgn">Export PGN</button><button id="about">About & privacy</button></footer>
   </main>
-  <nav class="mobile-dock" aria-label="Practice actions"><button class="mobile-ask" id="mobile-ask-coach">✦ Ask coach</button><button id="mobile-back-board">↑ Back to board</button></nav>
+  <nav class="mobile-dock" aria-label="Practice actions"><button class="mobile-ask" id="mobile-ask-coach">✦ Best move</button><button id="mobile-back-board">↑ Back to board</button></nav>
   <dialog id="mobile-tools"><div class="dialog-top"><h2>Game tools</h2><button class="icon-button" data-close="mobile-tools" aria-label="Close game tools">×</button></div><div class="tools-grid"><button class="button secondary" data-tool="reset-board">Reset board</button><button class="button secondary" data-tool="change-opponent">Change opponent move</button><button class="button secondary" data-tool="play-from-here">Play from here</button><button class="button secondary" data-tool="flip">Flip board</button><button class="button secondary" data-tool="review-game">End game & review</button><button class="button secondary" data-tool="backup">Export backup</button><button class="button secondary" data-tool="restore">Import backup</button><button class="button secondary" data-tool="pgn">Export PGN</button><button class="button secondary" data-tool="about">About & privacy</button></div><p id="mobile-opening"></p></dialog>
   <dialog id="setup"><form id="setup-form"><div class="dialog-top"><span class="eyebrow">A FRESH POSITION, A FRESH PERSPECTIVE</span><button type="button" class="icon-button" data-close="setup" aria-label="Close setup">×</button></div><h2>Set up your practice.</h2><p class="muted">Choose the challenge. We’ll meet you where you are.</p>
     <div class="form-grid"><label>Your teaching level<select name="level"><option value="600">600 · Learning the basics</option><option value="900">900 · Building foundations</option><option value="1100">1100 · Finding your rhythm</option><option value="1350" selected>1350 · Club player</option><option value="1600">1600 · Sharpening your game</option><option value="1900">1900 · Advanced</option><option value="2200">2200 · Expert</option><option value="2500">2500 · Master</option></select></label><label>Opponent target strength<input name="opponent" type="number" min="400" max="3000" step="50" value="1350" required/><small>Approximate engine strength, not a platform rating.</small></label></div>
@@ -164,6 +168,7 @@ function drawBoard() {
   $('#arrow-line').style.display = arrow && !highlights.lines.some(l=>l.from===arrow.from&&l.to===arrow.to) ? '' : 'none';
   if (arrow) { const a=squarePoint(arrow.from),b=squarePoint(arrow.to); ['x1','y1','x2','y2'].forEach((attr,i)=>$('#arrow-line').setAttribute(attr,[...a,...b][i])); }
   paintMobilePreview();
+  paintQuickCoach();
   $('#preview-bar').hidden = !preview;
   $('#preview-bar').classList.toggle('coach-line',!!preview?.coach);
   if (preview) $('#preview-bar').innerHTML = `<span>${esc(preview.label)}${preview.line ? ` · ${preview.step}/${preview.line.length}`:''}</span><div>${preview.line?`<button class="icon-button" id="line-back" ${preview.step===0?'disabled':''} aria-label="Previous variation move">←</button><button class="icon-button" id="line-next" ${preview.step>=preview.line.length?'disabled':''} aria-label="Next variation move">→</button>`:''}<button class="button subtle" id="exit-preview">${preview.coach?'Back to my position':current?.finished?'Back to final position':'Back to game'}</button></div>`;
@@ -186,6 +191,46 @@ function drawBoard() {
   if(preview?.opponentEdit)$('#opponent-edit-bar').innerHTML=`<div><strong>What if ${shown.turn()==='w'?'White':'Black'} played something else?</strong><p>Drag an opponent piece to replace <b>${esc(preview.opponentEdit.san)}</b>. Your original game stays saved.</p></div><button class="button subtle" id="cancel-opponent-edit">Cancel</button>`;
   syncEvaluation();
 }
+function latestOwnAttempt() {
+  if(!current)return null;
+  const parity=current.color==='w'?0:1;
+  let ply=current.moves.length-1;
+  if(ply%2!==parity)ply--;
+  if(ply<0)return null;
+  return [...current.attempts].reverse().find(a=>a.ply===ply&&a.uci===current.moves[ply])||null;
+}
+function paintQuickCoach() {
+  const section=$('#mobile-glance'),attempt=latestOwnAttempt();
+  section.hidden=!current || !!preview;
+  const visible=coachOn || current?.finished;
+  const badge=visible?moveBadge(attempt?.grade):{tone:'neutral',symbol:'○',label:'Coach off'};
+  const lastOwn=current?current.moves.length-(game.turn()===current.color?1:0):0;
+  const pending=visible && !!current && busy && !attempt && !!current.moves.length;
+  const key=`${current?.id}|${attempt?.ply}|${attempt?.uci}|${visible}|${lastOwn}`;
+  if(key!==mobileGradeKey){mobileGradeOpen=false;mobileGradeKey=key;}
+  const button=$('#mobile-move-grade');
+  button.className=`mobile-grade-button grade-${badge.tone}`;
+  button.disabled=!visible || !attempt;
+  button.setAttribute('aria-expanded',String(mobileGradeOpen));
+  button.setAttribute('aria-label',attempt&&visible?`${attempt.san}: ${badge.label}. ${badge.detail||'Explain this move.'}`:pending?'Analysing your move':badge.label);
+  button.innerHTML=`<span class="grade-disc" aria-hidden="true">${pending?'…':badge.symbol}</span><span><strong>${attempt&&visible?esc(attempt.san):''}</strong><small>${pending?'Analysing…':!attempt&&visible?'Your move':esc(badge.label)}${attempt&&visible?' · why?':''}</small></span>`;
+  const explanation=$('#mobile-grade-explanation');explanation.hidden=!mobileGradeOpen || !attempt || !visible;
+  if(!explanation.hidden)explanation.innerHTML=`<p class="quick-explanation-title">${esc(attempt.san)} · ${esc(badge.label)}</p>${attempt.explanation.facts.map(t=>`<p>${esc(t)}</p>`).join('')}<button class="button secondary" id="mobile-grade-retry" ${busy?'disabled':''}>↶ Retry this move</button>`;
+  $('#mobile-best-move').disabled=!canAskCoach();
+  const quick=$('#mobile-quick-coach');quick.hidden=!coachHelp?.quick || section.hidden;
+  if(quick.hidden){quick.innerHTML='';return;}
+  if(coachHelp.stage==='loading'){quick.innerHTML='<p class="quick-status">Finding the best move…</p>';return;}
+  if(coachHelp.stage==='error'){quick.innerHTML='<p class="quick-status">Couldn’t analyse this position. Tap Best move to retry.</p>';return;}
+  const h=coachHelp,choice=h.choices?.[h.choiceIndex||0];if(!choice){quick.hidden=true;return;}
+  const count=h.choices.length,index=h.choiceIndex||0;
+  quick.innerHTML=`<div class="quick-choice-row"><span class="quick-choice-name"><span aria-hidden="true">${choice.best?'★':'✓'}</span><strong>${esc(choice.suggestion.san)}</strong><small>${choice.best?'Best':'OK alternative'} · ${index+1}/${count}</small></span><button class="icon-button" id="quick-choice-back" aria-label="Previous playable alternative" ${index===0?'disabled':''}>←</button><button class="icon-button" id="quick-choice-next" aria-label="Next playable alternative" ${index>=count-1?'disabled':''}>→</button><button class="icon-button" id="quick-close" aria-label="Hide suggested move">×</button></div><div class="quick-choice-actions"><button class="button subtle" id="quick-choice-why" aria-expanded="${!!h.quickDetails}" aria-controls="quick-choice-explanation">ⓘ Why?</button><button class="button subtle" id="quick-choice-preview">Preview ↗</button><button class="button primary" id="quick-choice-play" ${canPlayCoachMove()?'':'disabled'}>Play ${esc(choice.suggestion.san)}</button></div><div id="quick-choice-explanation" ${h.quickDetails?'':'hidden'}><p>${esc(choice.suggestion.idea)}</p><small>Stockfish depth ${h.depth}. ${count===1?'No other similarly strong moves found in this search.':'Arrows browse similarly strong choices from the engine’s top five.'} Help marks this decision as assisted.</small></div>`;
+}
+function chooseQuickAlternative(delta) {
+  if(!coachHelp?.quick || !coachHelp.choices?.length || coachHelp.fen!==shownGame().fen())return;
+  coachHelp.choiceIndex=Math.max(0,Math.min(coachHelp.choices.length-1,(coachHelp.choiceIndex||0)+delta));
+  coachHelp.suggestion=coachHelp.choices[coachHelp.choiceIndex].suggestion;
+  arrow=uciMove(coachHelp.suggestion.uci);selected=null;render();
+}
 function paintMobilePreview() {
   const suggestion=preview?.coach?coachHelp?.suggestion:preview?.line?{fen:preview.base,pv:preview.line,line:sanLine(preview.base,preview.line,preview.line.length),hint:'Step forward to explore the suggested move and the opponent’s reply.'}:null;
   const lesson=suggestion?previewLesson(suggestion,preview.step,playerLevel()):null;
@@ -203,7 +248,7 @@ function paintMobilePreview() {
       <button class="icon-button" id="mobile-preview-next" aria-label="Next preview move" ${lesson.step>=lesson.total?'disabled':''}>→</button>
       <button class="button subtle" id="mobile-preview-return">Return to game</button>
     </div>
-    <button class="button subtle" id="mobile-preview-details" aria-controls="mobile-preview-text" aria-expanded="${mobilePreviewExpanded}">${mobilePreviewExpanded?'Show less ↑':'Expand explanation ↓'}</button>
+    <button class="button subtle" id="mobile-preview-details" aria-controls="mobile-preview-text" aria-expanded="${mobilePreviewExpanded}">${mobilePreviewExpanded?'Hide explanation ↑':'ⓘ Explain this move'}</button>
     <div id="mobile-preview-text">
       <p class="mobile-preview-idea"><strong>Idea:</strong> ${esc(lesson.reason)}</p>
       <p class="mobile-preview-watch"><strong>Watch:</strong> ${esc(lesson.watch)}</p>
@@ -224,7 +269,7 @@ function togglePreviewExplanation() {
   card.classList.toggle('is-expanded',mobilePreviewExpanded);
   $('#mobile-preview-extra').hidden=!mobilePreviewExpanded;
   button.setAttribute('aria-expanded',String(mobilePreviewExpanded));
-  button.textContent=mobilePreviewExpanded?'Show less ↑':'Expand explanation ↓';
+  button.textContent=mobilePreviewExpanded?'Hide explanation ↑':'ⓘ Explain this move';
   // Expanding grows the same page; keep the board and current reading position steady.
   window.scrollTo({top,left,behavior:'instant'});
 }
@@ -247,21 +292,28 @@ function coachHelpMarkup() {
   let text=h.stage==='loading'?'<h3>Finding a useful move…</h3><p>Analysing the position on your board.</p>':h.stage==='error'?`<h3>Couldn’t analyse this position</h3><p>${esc(h.error)}</p><button class="button secondary" id="coach-retry-help">Try again</button>`:h.stage==='hint'?`<h3>A hint first</h3><p>${esc(h.suggestion.hint)}</p><button class="button primary" id="coach-show-move">Show move + idea</button>`:`<h3>${esc(lesson?.heading || 'Consider '+h.suggestion.san)}</h3>${legend}${lesson?`<div class="coach-step-lesson" data-step="${lesson.step}"><span class="eyebrow">MOVE ${lesson.step} OF ${lesson.total}</span><p><strong>Idea:</strong> ${esc(lesson.reason)}</p>${lesson.actor==='opponent'?`<p><strong>Possible plan:</strong> ${esc(lesson.plan)}</p>`:''}<p class="coach-step-watch"><strong>Watch:</strong> ${esc(lesson.watch)}</p>${lesson.next?`<p class="coach-step-next"><strong>Next in this line:</strong> ${esc(lesson.next)}</p>`:''}</div>`:''}<div class="coach-preview-actions"><button class="button secondary" id="coach-preview-move">Preview move</button>${h.suggestion.pv.length>1?'<button class="button secondary" id="coach-preview-reply">Preview reply</button>':''}<button class="button primary" id="coach-play-move" ${canPlayCoachMove()?'':'disabled'}>${lesson?'Play '+esc(h.suggestion.san):'Play this move'}</button></div>${lesson?`<details class="coach-original-idea"><summary>Original suggestion & full line</summary>${original}</details>`:original}<small>Depth ${h.depth} · Stockfish 19 Lite. One possible line; the opponent can choose another reply.</small>`;
   return `<section class="coach-help" aria-live="polite"><span class="eyebrow">ASK COACH · ${preview?.coach?'BOARD PREVIEW':preview?'DISPLAYED POSITION':'YOUR CURRENT POSITION'}</span>${text}<button class="button subtle" id="coach-dismiss">Dismiss</button><p class="analysis-note">Help marks this decision as assisted, including when coaching is off.</p></section>`;
 }
-async function askCoach() {
+async function askCoach({direct=false}={}) {
   if(!canAskCoach())return;
   tab='coach';mobileCoachView='coach';
   const fen=shownGame().fen(),ply=preview?.historyPly ?? current.moves.length;
-  if(coachHelp?.fen===fen && coachHelp.suggestion){render();if(matchMedia('(max-width:900px)').matches)scrollToSection('coach');return;}
+  if(coachHelp?.fen===fen && coachHelp.suggestion && (!direct || coachHelp.choices)){
+    if(direct){coachHelp.quick=true;coachHelp.stage='answer';coachHelp.choiceIndex=0;coachHelp.suggestion=coachHelp.choices[0].suggestion;arrow=uciMove(coachHelp.suggestion.uci);}
+    render();if(!direct && matchMedia('(max-width:900px)').matches)scrollToSection('coach');return;
+  }
   current.hints ||= [];
   if(!usedCoachHelp(current,fen,ply))current.hints.push({fen,ply,created:new Date().toISOString()});
-  const request={fen,gameId:current.id,origin:preview?structuredClone(preview):null,stage:'loading'};coachHelp=request;render();persist();
-  if(matchMedia('(max-width:900px)').matches)scrollToSection('coach');
+  const request={fen,gameId:current.id,origin:preview?structuredClone(preview):null,stage:'loading',quick:direct};coachHelp=request;render();persist();
+  if(!direct && matchMedia('(max-width:900px)').matches)scrollToSection('coach');
   try {
-    const search=await engine.search(fen,{count:1,ms:1100});
+    const search=await engine.search(fen,{count:direct?Math.min(5,shownGame().moves().length):1,ms:direct?1300:1100});
     if(coachHelp!==request || current?.id!==request.gameId || shownGame().fen()!==fen)return;
     const suggestion=coachSuggestion(fen,search.lines[0],playerLevel());
     if(!suggestion)throw Error('No legal suggestion was returned. Please try again.');
-    Object.assign(request,{stage:'hint',suggestion,depth:search.depth});render();
+    const choices=direct?playableChoices(fen,search.lines,playerLevel()):null;
+    if(direct && !choices.length)throw Error('No legal suggestion was returned.');
+    Object.assign(request,{stage:direct?'answer':'hint',suggestion:direct?choices[0].suggestion:suggestion,depth:search.depth,...(direct?{choices,choiceIndex:0}:{})});
+    if(direct)arrow=uciMove(request.suggestion.uci);
+    render();
   }catch(error){if(coachHelp!==request)return;Object.assign(request,{stage:'error',error:error.message});render();}
 }
 function revealCoachMove() {
@@ -485,7 +537,7 @@ function stepPreview(delta) {
   const opening=openingAt(preview.fen);$('#opening-name').textContent=opening?`${opening.eco} · ${opening.name}`:'Engine continuation';
 }
 function returnToGame() {
-  if(preview?.coach){preview=coachHelp?.origin?structuredClone(coachHelp.origin):null;arrow=null;selected=null;render();return;}
+  if(preview?.coach){preview=coachHelp?.origin?structuredClone(coachHelp.origin):null;arrow=coachHelp?.quick?uciMove(coachHelp.suggestion.uci):null;selected=null;render();return;}
   preview=null;arrow=null;selected=null;focus=current?.attempts.at(-1)||null;render();
 }
 function navigateHistory(ply) {
@@ -665,7 +717,7 @@ document.addEventListener('click',e=>{
   if(b.dataset.candidate!=null){showCandidate(Number(b.dataset.candidate));return;}
   if(b.dataset.history!=null){viewHistory(Number(b.dataset.history));return;} if(b.dataset.game){openRecord(b.dataset.game);return;}
   if(b.dataset.opponentPly!=null){changeOpponentMove(Number(b.dataset.opponentPly));return;}
-  const actions={ 'mobile-preview-back':()=>stepPreview(-1),'mobile-preview-next':()=>stepPreview(1),'mobile-preview-return':returnToGame,'mobile-preview-details':togglePreviewExplanation,'ask-coach':askCoach,'mobile-ask-coach':askCoach,'coach-show-move':()=>revealCoachMove(),'coach-preview-move':()=>previewCoachMove(1),'coach-preview-reply':()=>previewCoachMove(2),'coach-play-move':playCoachMove,'coach-dismiss':dismissCoachHelp,'coach-retry-help':()=>{coachHelp=null;askCoach();},'mobile-back-board':()=>scrollToSection('board'),'mobile-change-opponent':()=>changeOpponentMove(),'mobile-more':openMobileTools,'mobile-game-tools':openMobileTools,'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
+  const actions={ 'mobile-move-grade':()=>{mobileGradeOpen=!mobileGradeOpen;paintQuickCoach();},'mobile-grade-retry':retryMove,'mobile-best-move':()=>askCoach({direct:true}),'quick-choice-back':()=>chooseQuickAlternative(-1),'quick-choice-next':()=>chooseQuickAlternative(1),'quick-close':()=>{if(coachHelp)coachHelp.quick=false;arrow=null;render();},'quick-choice-why':()=>{if(coachHelp)coachHelp.quickDetails=!coachHelp.quickDetails;paintQuickCoach();},'quick-choice-preview':()=>previewCoachMove(1),'quick-choice-play':playCoachMove,'mobile-preview-back':()=>stepPreview(-1),'mobile-preview-next':()=>stepPreview(1),'mobile-preview-return':returnToGame,'mobile-preview-details':togglePreviewExplanation,'ask-coach':askCoach,'mobile-ask-coach':()=>askCoach({direct:true}),'coach-show-move':()=>revealCoachMove(),'coach-preview-move':()=>previewCoachMove(1),'coach-preview-reply':()=>previewCoachMove(2),'coach-play-move':playCoachMove,'coach-dismiss':dismissCoachHelp,'coach-retry-help':()=>{coachHelp=null;askCoach();},'mobile-back-board':()=>scrollToSection('board'),'mobile-change-opponent':()=>changeOpponentMove(),'mobile-more':openMobileTools,'mobile-game-tools':openMobileTools,'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
     'exit-preview':returnToGame,'cancel-opponent-edit':returnToGame,'change-opponent':changeOpponentMove,'explain-evaluation':explainEvaluation,'retry-evaluation':()=>{$('#info').close();positionAnalysis.retry(shownGame().fen());},'line-back':()=>stepPreview(-1),'line-next':()=>stepPreview(1),'history-start':()=>navigateHistory(0),'history-back':()=>stepHistory(-1),'history-next':()=>stepHistory(1),'history-live':returnToGame,'play-from-here':forkFromHistory,'show-punishment':showPlayedLine,backup:exportBackup,restore:()=>$('#backup-file').click(),pgn:exportPgn,
     'review-moves':()=>{tab='moves';render();},'review-game':()=>{if(!current||busy)return;finishGame();tab='moves';persist();render();},about:()=>{
       $('#info-body').innerHTML='<h2>A practice room of your own.</h2><p>Between Moves runs chess analysis on your device using Stockfish 19 Lite. Coaching uses programmed rules and verified engine continuations, with no AI API.</p><p>Games, retries, and learning history are stored in this browser using IndexedDB. No accounts, analytics, or game uploads. Your host still handles ordinary website requests.</p><p>Clearing browser data can erase history. Export backups regularly, and before switching domains, browsers, or devices. Import merges sessions without replacing existing records.</p><p>Opponent ratings are approximate targets. Level assessment is an experimental practice-difficulty estimate, not a calibrated platform rating. Positional explanations and practice book lines have limited coverage. Opening recognition uses the local Lichess opening-name database (CC0).</p><p>Stockfish.js is distributed under GPLv3. <a href="https://github.com/nmrugg/stockfish.js/tree/v19.0.1" target="_blank" rel="noreferrer">Engine source</a> · <a href="./engine/COPYING.txt" target="_blank">Engine licence</a>. Chess rules by chess.js (BSD-2-Clause).</p>';
