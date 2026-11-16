@@ -5,12 +5,12 @@ main{padding-top:16px}
 .practice-identity>div{min-width:0}
 .practice-identity strong{display:block;white-space:nowrap}
 .practice-identity .status-pill{margin:0;flex-shrink:0}
-.practice-topbar .practice-actions{margin-left:auto;gap:6px}
-.practice-topbar .practice-actions #new-game{min-height:44px;padding:8px 12px;font-size:13px;gap:5px;white-space:nowrap}
-.practice-topbar .practice-actions #reset-board{padding:0 9px;font-size:13px}
+.practice-brand-bar .practice-actions{margin-left:auto;gap:6px}
+.practice-brand-bar .practice-actions #new-game{min-height:44px;padding:8px 12px;font-size:13px;gap:5px;white-space:nowrap}
+.practice-brand-bar .practice-actions #reset-board{padding:0 9px;font-size:13px}
 .timeline .board-best-button{margin-left:auto;flex-basis:40px;width:40px;height:40px;font-size:22px}
 .timeline .coaching-switch{margin-left:0}
-@media(max-width:1100px) and (min-width:901px){.practice-actions .new-practice-label,.practice-actions .reset-label{display:none}.practice-topbar .practice-actions #new-game,.practice-topbar .practice-actions #reset-board{width:44px;padding:0}.practice-topbar .practice-actions #new-game{font-size:23px}}
+@media(max-width:1100px) and (min-width:901px){.practice-actions .new-practice-label,.practice-actions .reset-label{display:none}.practice-brand-bar .practice-actions #new-game,.practice-brand-bar .practice-actions #reset-board{width:44px;padding:0}.practice-brand-bar .practice-actions #new-game{font-size:23px}}
 @media(max-width:900px){
   main{padding-top:8px}
   .play-area>.practice-topbar:first-child{display:flex;min-height:48px;margin:0 0 7px;gap:8px}
@@ -18,9 +18,9 @@ main{padding-top:16px}
   .practice-topbar .practice-identity strong{font-size:13px;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .practice-topbar .practice-identity small{display:none}
   .practice-topbar .practice-identity .status-pill{font-size:11px;padding:0;border:0;background:none;line-height:1.4}
-  .practice-topbar .practice-actions{gap:4px}
-  .practice-topbar .practice-actions #new-game,.practice-topbar .practice-actions #reset-board{width:44px;height:44px;min-height:44px;padding:0}
-  .practice-topbar .practice-actions #new-game{font-size:23px}
+  .practice-brand-bar .practice-actions{gap:4px}
+  .practice-brand-bar .practice-actions #new-game,.practice-brand-bar .practice-actions #reset-board{width:44px;height:44px;min-height:44px;padding:0}
+  .practice-brand-bar .practice-actions #new-game{font-size:23px}
   .timeline{gap:3px}
   .timeline .board-best-button{margin-left:auto;flex:0 0 36px;width:36px;height:40px;border:0;background:transparent;font-size:24px}
   .timeline .coaching-switch select{width:88px}
@@ -35,10 +35,21 @@ main{padding-top:16px}
   .timeline #review-game{font-size:11px;padding:5px 4px}
 }
 
-/* Keep the room’s identity without restoring the tall introductory banner. */
-.practice-brand-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:34px;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid #e3e5dc}
-.compact-brand{display:inline-flex;align-items:center;gap:8px;color:#214337;text-decoration:none;font-family:'Manrope',sans-serif;font-size:21px;font-weight:800;letter-spacing:-.8px;line-height:1.2}
-.compact-brand-light{font-weight:450}.compact-brand-knight{font-size:28px;line-height:1}
-.compact-saved{font-size:11px;color:#6c7d64;white-space:nowrap}.compact-saved>span{font-size:8px;color:#819e76;margin-right:4px}
-@media(max-width:900px){.practice-brand-bar{min-height:30px;margin-bottom:8px;padding-bottom:7px}.compact-brand{font-size:18px;gap:6px}.compact-brand-knight{font-size:24px}.compact-saved{font-size:10px}}
-@media(max-width:360px){.compact-saved{font-size:9px}.compact-brand{font-size:17px}}
+/* Warm, compact identity; the board keeps its original grid dimensions. */
+.practice-brand-bar{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:68px;margin:0 0 18px;padding:0 0 14px;border-bottom:1px solid #e0e4d8}
+.brand-lockup{position:relative;padding-bottom:17px;flex-shrink:0}
+.compact-brand{display:inline-flex;align-items:center;gap:11px;color:#214337;text-decoration:none;font-family:'Manrope',sans-serif;font-size:27px;font-weight:800;letter-spacing:-1px;line-height:1.2}
+.compact-brand-light{font-weight:450}
+.compact-brand-knight{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:11px;background:#e7ecdf;color:#31513d;font-size:30px;line-height:1}
+.brand-tagline{position:absolute;left:51px;bottom:0;margin:0;color:#7b7c65;font-size:13px;line-height:1.4;letter-spacing:.1px}
+.practice-topbar .practice-identity{width:100%;justify-content:space-between}
+@media(max-width:900px){
+  .practice-brand-bar{min-height:54px;margin-bottom:10px;padding-bottom:9px;gap:8px}
+  .brand-lockup{padding:0;min-width:0;flex-shrink:1}
+  .compact-brand{font-size:19px;gap:6px;letter-spacing:-.7px;white-space:nowrap}
+  .compact-brand-knight{width:28px;height:32px;border-radius:8px;font-size:24px}
+  .brand-tagline{display:none}
+  .play-area>.practice-topbar:first-child{min-height:32px}
+  .practice-topbar .practice-identity{flex-direction:row;align-items:center;gap:6px}
+}
+@media(max-width:360px){.compact-brand{font-size:17px;gap:5px}.compact-brand-knight{width:24px;height:30px;font-size:22px}.practice-brand-bar{gap:4px}}
