@@ -1,0 +1,36 @@
+/* Open directly into practice. Board and sidebar widths keep their existing grid. */
+main{padding-top:16px}
+.play-area>.practice-topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;height:auto;margin:0 0 8px}
+.practice-identity{display:flex;align-items:center;gap:12px;min-width:0}
+.practice-identity>div{min-width:0}
+.practice-identity strong{display:block;white-space:nowrap}
+.practice-identity .status-pill{margin:0;flex-shrink:0}
+.practice-topbar .practice-actions{margin-left:auto;gap:6px}
+.practice-topbar .practice-actions #new-game{min-height:44px;padding:8px 12px;font-size:13px;gap:5px;white-space:nowrap}
+.practice-topbar .practice-actions #reset-board{padding:0 9px;font-size:13px}
+.timeline .board-best-button{margin-left:auto;flex-basis:40px;width:40px;height:40px;font-size:22px}
+.timeline .coaching-switch{margin-left:0}
+@media(max-width:1100px) and (min-width:901px){.practice-actions .new-practice-label,.practice-actions .reset-label{display:none}.practice-topbar .practice-actions #new-game,.practice-topbar .practice-actions #reset-board{width:44px;padding:0}.practice-topbar .practice-actions #new-game{font-size:23px}}
+@media(max-width:900px){
+  main{padding-top:8px}
+  .play-area>.practice-topbar:first-child{display:flex;min-height:48px;margin:0 0 7px;gap:8px}
+  .practice-topbar .practice-identity{flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+  .practice-topbar .practice-identity strong{font-size:13px;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .practice-topbar .practice-identity small{display:none}
+  .practice-topbar .practice-identity .status-pill{font-size:11px;padding:0;border:0;background:none;line-height:1.4}
+  .practice-topbar .practice-actions{gap:4px}
+  .practice-topbar .practice-actions #new-game,.practice-topbar .practice-actions #reset-board{width:44px;height:44px;min-height:44px;padding:0}
+  .practice-topbar .practice-actions #new-game{font-size:23px}
+  .timeline{gap:3px}
+  .timeline .board-best-button{margin-left:auto;flex:0 0 36px;width:36px;height:40px;border:0;background:transparent;font-size:24px}
+  .timeline .coaching-switch select{width:88px}
+  .timeline-buttons .icon-button{width:32px;min-width:32px}
+}
+@media(max-width:360px){
+  .timeline{gap:2px}
+  .timeline-buttons{gap:0}
+  .timeline-buttons .icon-button{width:30px;min-width:30px}
+  .timeline .board-best-button{flex-basis:32px;width:32px}
+  .timeline .coaching-switch select{width:82px;padding-left:5px;padding-right:3px}
+  .timeline #review-game{font-size:11px;padding:5px 4px}
+}
