@@ -12,7 +12,7 @@ let db, state, game = new Chess(), current, selected = null, busy = true, engine
 let coachOn = true, awaiting = false, retrying = false, focus = null, preview = null, arrow = null;
 let tab = 'coach', generation = 0, flipped = false, toastTimer, saveQueue = Promise.resolve();
 const engine = new Engine(`${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`);
-engine.ready.then(() => { engineReady = true; busy = false; render(); if (current && !current.finished && game.turn() !== current.color && !awaiting) opponentTurn(); }).catch(handleError);
+engine.ready.then(() => { engineReady = true; busy = false; render(); resumeSession(); }).catch(handleError);
 
 $('#app').innerHTML = `
   <header class="masthead"><a class="brand" href="./" aria-label="Between Moves home"><span class="brand-mark">♞</span><span>between<span class="brand-light">moves</span><small>YOUR PERSONAL CHESS ROOM</small></span></a>
@@ -89,7 +89,7 @@ function render() {
 }
 function renderCoach(active) {
   const f=focus;
-  let html=`<div class="coach-header"><div><span class="eyebrow">YOUR CORNER OF THE BOARD</span><h2>Let’s think it through.</h2></div><label class="toggle" title="Toggle live coaching"><input id="coach-toggle" type="checkbox" ${coachOn?'checked':''}/><span></span></label></div>`;
+  let html=`<div class="coach-header"><div><span class="eyebrow">YOUR CORNER OF THE BOARD</span><h2>Let’s think it through.</h2></div><label class="toggle" title="Toggle live coaching"><input id="coach-toggle" aria-label="Toggle live coaching" type="checkbox" ${coachOn?'checked':''}/><span></span></label></div>`;
   if (!coachOn && active && !awaiting) {
     html+=`<div class="coach-empty"><span class="empty-icon">♘</span><h3>Just you and the board.</h3><p>Play freely. Your moves are saved for the review. Bring the coach back whenever you like.</p></div>`;
   } else if (f && (coachOn || !active)) {
@@ -105,7 +105,7 @@ function renderCoach(active) {
     html+=`<div class="coach-empty"><div class="empty-board">♘<span>✦</span></div><h3>${current?'Your move. Your discovery.':'A good habit starts here.'}</h3><p>${current?'Make a move on the board. We’ll compare five possibilities, unpack the idea, and keep what you learn.':'Choose an opening and a worthy opponent. Your coach will help you understand the choices between moves.'}</p>${!current?'<button class="button primary" id="start-first">Start your first practice ↗</button>':''}</div>`;
   }
   const summary=learningSummary(state.games), pattern=summary.patterns.find(p=>p.count>=2);
-  html+=`<div class="habit-card"><span class="habit-icon">✦</span><div><span class="eyebrow">${pattern?'A PATTERN TO NOTICE':'ONE SMALL HABIT'}</span><p>${esc(pattern?.tip || 'Before you move, ask: what is my opponent threatening?')}</p></div></div>`;
+  if(coachOn || !active) html+=`<div class="habit-card"><span class="habit-icon">✦</span><div><span class="eyebrow">${pattern?'A PATTERN TO NOTICE':'ONE SMALL HABIT'}</span><p>${esc(pattern?.tip || 'Before you move, ask: what is my opponent threatening?')}</p></div></div>`;
   if (current?.finished) html+=`<div class="review-banner"><strong>${esc(current.result || 'Practice saved')}</strong><p>Select a move in the Moves tab to revisit its position and coaching.</p><button class="button secondary" id="review-moves">Explore game moves →</button></div>`;
   $('#panel-content').innerHTML=html;
 }
@@ -148,14 +148,16 @@ async function startGame(event) {
   $('#setup').close(); await persist(); render();
   if(current.color==='b') opponentTurn();
 }
-async function makeMove(from,to,promotion='q') {
+async function makeMove(from,to,promotion='q',recovered=null) {
   if(busy || awaiting || preview || !current || current.finished || game.turn()!==current.color) return;
   const legal=game.moves({square:from,verbose:true}).filter(m=>m.to===to);
   if(!legal.length) { selected=null; drawBoard(); return; }
   if(legal.some(m=>m.promotion) && arguments.length<3) { choosePromotion(from,to); return; }
   const token=generation, before=game.fen(), book=bookOptions(getOpening(),game.history()), ply=game.history().length;
-  const wasRetry=retrying, wasAssisted=coachOn || retrying;
-  const move=game.move({from,to,promotion}); current.moves.push(move.lan); selected=null; preview=null; arrow=null; busy=true; render(); await persist();
+  const wasRetry=recovered?.retry ?? retrying, wasAssisted=recovered?.assisted ?? (coachOn || retrying);
+  const move=game.move({from,to,promotion}); current.moves.push(move.lan);
+  current.pending={before,uci:move.lan,retry:wasRetry,assisted:wasAssisted};
+  selected=null; preview=null; arrow=null; busy=true; render(); await persist();
   try {
     const search=await engine.search(before,{count:Math.min(5,new Chess(before).moves().length),ms:1000});
     if(token!==generation) return;
@@ -167,7 +169,7 @@ async function makeMove(from,to,promotion='q') {
     const grade=gradeMove(search.lines[0],actual,move.lan===search.lines[0].pv[0]);
     const explanation=explainMove(before,move,search.lines[0],actual,grade,playerLevel(),book);
     focus={before,after:game.fen(),uci:move.lan,san:move.san,ply,lines:search.lines,actual,grade,explanation,depth:search.depth,retry:wasRetry,assisted:wasAssisted};
-    current.attempts.push(focus); retrying=false; current.retrying=false; busy=false; awaiting=coachOn;
+    current.attempts.push(focus); current.pending=null; retrying=false; current.retrying=false; busy=false; awaiting=coachOn;
     if(game.isGameOver() && !coachOn) finishGame(terminalResult());
     await persist(); render();
     if(!coachOn && !current.finished) opponentTurn();
@@ -175,7 +177,7 @@ async function makeMove(from,to,promotion='q') {
     busy=false; awaiting=true;
     // Keep the played position recoverable; offer retry/continue even when analysis fails.
     focus={before,after:game.fen(),uci:move.lan,san:move.san,ply,lines:[],actual:null,grade:{label:'Unrated',severity:0,loss:0},explanation:{facts:['Analysis was interrupted. Retry this move or continue the game.'],tags:[]},depth:0,retry:wasRetry,assisted:wasAssisted};
-    current.attempts.push(focus); await persist(); render(); toast(error.message);
+    current.attempts.push(focus); current.pending=null; await persist(); render(); toast(error.message);
   }
 }
 function choosePromotion(from,to) {
@@ -237,8 +239,15 @@ async function importBackup(file) {
   const incoming=validateBackup(JSON.parse(await file.text()));
   // Validate legal game histories before merging. Existing records always win on duplicate IDs.
   for(const record of incoming.games) { historyGame(record); for(const attempt of record.attempts) { new Chess(attempt.before); if(!Array.isArray(attempt.lines)||!Array.isArray(attempt.explanation?.facts)||!Array.isArray(attempt.explanation?.tags)||typeof attempt.grade?.severity!=='number')throw Error('A coaching record in this backup is invalid.'); } }
+  const wasEmpty=state.games.length===0;
   const ids=new Set(state.games.map(g=>g.id)); let count=0;
   incoming.games.forEach(g=>{if(!ids.has(g.id)){state.games.push(g);ids.add(g.id);count++;}});
+  if(wasEmpty){
+    const s=incoming.settings;
+    state.settings={level:Number(s.level)||1350,opponent:Number(s.opponent)||1350,color:s.color==='b'?'b':'w',opening:OPENINGS.some(o=>o.id===s.opening)?s.opening:'random',assess:!!s.assess};
+    state.active=state.games.some(g=>g.id===incoming.active)?incoming.active:state.games.at(-1)?.id;
+    if(state.active)openRecord(state.active);
+  }
   await persist();render();toast(`Imported ${count} practice sessions. Your existing history was kept.`);
 }
 function openRecord(id) {
@@ -246,7 +255,15 @@ function openRecord(id) {
   current=record;game=historyGame();state.active=id;coachOn=current.coach ?? true;flipped=current.color==='b';focus=current.attempts.at(-1)||null;
   awaiting=!current.finished && game.turn()!==current.color && !!focus && focus.after===game.fen() && coachOn;
   preview=null;arrow=null;selected=null;retrying=!!current.retrying;tab=current.finished?'moves':'coach';generation++;persist();render();
-  if(!current.finished && game.turn()!==current.color && !awaiting)opponentTurn();
+  resumeSession();
+}
+function resumeSession() {
+  if(!engineReady || !current || current.finished || busy)return;
+  if(current.pending && current.moves.at(-1)===current.pending.uci){
+    const pending=current.pending; game.undo();current.moves.pop();awaiting=false;
+    const move=uciMove(pending.uci);makeMove(move.from,move.to,move.promotion||'q',pending);return;
+  }
+  if(game.turn()!==current.color && !awaiting)opponentTurn();
 }
 
 $('#setup-form').addEventListener('submit',startGame);
@@ -283,7 +300,7 @@ try {
   db=await openStore();state=await readState(db);
   const active=state.games.find(g=>g.id===state.active);
   if(active){current=active;game=historyGame();coachOn=current.coach??true;flipped=current.color==='b';focus=current.attempts.at(-1)||null;retrying=!!current.retrying;awaiting=!current.finished && game.turn()!==current.color && coachOn && focus?.after===game.fen();}
-  render();
+  render();resumeSession();
   if(!state.games.length)setup();
 } catch(error) {
   state={version:1,games:[],settings:{level:1350,opponent:1350,color:'w',opening:'random'}};render();toast('Browser storage is unavailable. You can play, but export backups to keep your history.');

@@ -20,7 +20,7 @@ npm run preview
 
 ## Publish on GitHub Pages
 
-Build with `npm run build`, then publish the contents of `dist/` as the root of a `gh-pages` branch. In repository Settings → Pages, select Deploy from a branch → gh-pages → / (root). Relative asset paths support both repository URLs and custom domains. No server-side services or secrets are required.
+With Git and GitHub CLI authenticated to the repository owner, run `npm run deploy`. This builds the site and publishes `dist/` to the `gh-pages` branch, preserving its history. In repository Settings → Pages, select Deploy from a branch → gh-pages → / (root). Relative asset paths support both repository URLs and custom domains. No server-side services or secrets are required. Push source changes on `main` separately.
 
 ## Behaviour
 
@@ -38,7 +38,7 @@ IndexedDB stores sessions, first attempts, retries, engine lines, teaching setti
 
 ## Dependencies and licences
 
-- Stockfish.js 19.0.1 by Nathan Rugg and Stockfish contributors: GPL-3.0. Engine source: https://github.com/nmrugg/stockfish.js/tree/v19.0.1 (the package version also records the upstream source revision). Matching worker/WASM files are copied unchanged from the pinned npm package at build time; COPYING is served next to them. Preserve the engine notices and source access when redistributing. Upstream source/build instructions: https://github.com/nmrugg/stockfish.js.
+- Stockfish.js 19.0.1 by Nathan Rugg and Stockfish contributors: GPL-3.0. Matching source release: https://github.com/nmrugg/stockfish.js/tree/v19.0.1 (commit 0d5dd7944f88c817c07a26bc4fb1905d5f9c46d6). Matching worker/WASM files are copied unchanged from the pinned npm package at build time; COPYING is served next to them. Preserve the engine notices and source access when redistributing. Source download links and notices are in `public/THIRD-PARTY.md`.
 - chess.js 1.4.0: BSD-2-Clause. See `node_modules/chess.js/LICENSE`.
 - Application source is GPL-3.0-or-later. See LICENSE.
 
