@@ -1,0 +1,46 @@
+/* Mobile uses one document scroll; board and coaching share the page. */
+.mobile-position,.mobile-reply-actions{display:none}
+@media(max-width:900px){
+  html{height:auto;overflow-x:clip;overflow-y:auto;overscroll-behavior-y:auto;scroll-padding-top:12px}
+  body{height:auto;overflow:visible;overscroll-behavior:auto}
+  #app{height:auto;min-height:100dvh;display:block;overflow:visible}
+  main{display:block;padding:12px 12px calc(90px + env(safe-area-inset-bottom));width:100%;min-height:0}
+  .workspace{display:flex;flex-direction:column;align-items:center;gap:18px;height:auto;min-height:0}
+  .play-area{position:static;width:100%;max-width:580px;margin:0 auto;flex:none;scroll-margin-top:12px}
+  .play-area>.player-bar:first-child{display:flex;min-height:32px;height:auto;margin:0 0 7px}
+  .play-area>.player-bar:first-child strong{font-size:13px}
+  .board{touch-action:pan-y}.square{touch-action:pan-y}.square.can-drag{touch-action:none}
+  .evaluation-scale{display:grid;font-size:11px;gap:7px}.evaluation-panel{margin:8px 0 0}.evaluation-track{height:9px}
+  .evaluation-caption{min-height:38px}#evaluation-headline{font-size:14px}#evaluation-score{font-size:16px}#explain-evaluation{min-height:44px}
+  .mobile-position{display:block;font-size:16px;font-weight:600;line-height:1.6;padding:10px 2px 6px;overflow-wrap:anywhere;color:#294d36}
+  .timeline{min-height:46px;gap:6px;flex-wrap:wrap;display:flex}
+  .timeline-buttons{display:flex;gap:1px}.timeline .icon-button{width:44px;height:44px;min-width:44px;min-height:44px}
+  #history-position{white-space:normal;font-size:11px;min-width:0;text-align:right}
+  .mobile-tools-button{min-width:44px;min-height:44px}
+  .mobile-reply-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:10px 0}
+  #mobile-change-opponent{font-size:14px;min-height:46px;background:#edf2e7;border:1px solid #cfdcc5;color:#305a37}
+  #mobile-reply-label{font-size:13px;color:#596d51;line-height:1.5}
+  .board-note{display:flex;padding:8px 0 0;gap:4px}#opening-name{font-size:14px;white-space:normal;overflow:visible}#book-status{display:block;font-size:12px}
+  .side-panel{position:relative;display:block;width:100%;max-width:580px;height:auto;min-height:0;overflow:visible;flex:none;border-radius:10px;scroll-margin-top:12px}
+  .panel-tabs{height:48px;min-height:48px;position:static;border-radius:10px 10px 0 0;padding-left:12px;padding-right:60px;gap:8px}
+  .panel-tabs button{font-size:13px;min-height:46px}
+  #panel-content{height:auto;max-height:none;min-height:0;overflow:visible;overscroll-behavior:auto;scrollbar-gutter:auto;padding:16px 14px 20px}
+  .coach-header{top:6px;right:10px;height:36px;width:44px}
+  .feedback-card{padding:15px}.feedback-card p{font-size:16px;line-height:1.7}
+  .habit-card{display:flex}.coach-help{padding:14px;scroll-margin-top:12px}
+  .preview-bar{flex-wrap:wrap;padding:8px;margin:8px 0;gap:6px;font-size:14px}
+  .preview-bar>span,.preview-bar.coach-line>span{display:block;font-size:14px;line-height:1.5}
+  .preview-bar .button,.preview-bar .icon-button{min-height:44px;font-size:14px;padding:7px 10px}
+  .preview-bar.coach-line{flex-wrap:wrap}.preview-bar.coach-line>div{margin-left:auto}
+  .preview-bar.coach-line #exit-preview{font-size:14px}.preview-bar.coach-line #exit-preview::after{content:none}
+  .opponent-edit-bar{padding:12px;margin:0 0 10px;scroll-margin-top:12px}.opponent-edit-bar strong{font-size:16px}.opponent-edit-bar p{font-size:14px;line-height:1.6}.opponent-edit-bar .button{min-height:44px}
+  main>footer{display:flex;margin-top:24px;padding-bottom:12px}
+  .mobile-dock{position:fixed;left:0;right:0;bottom:0;z-index:12;display:flex;padding:7px 12px calc(7px + env(safe-area-inset-bottom));background:#fafbf7f5;border-top:1px solid #d9e1d0;box-shadow:0 -4px 18px #203d3010;backdrop-filter:blur(12px)}
+  .mobile-dock button{min-height:46px}
+}
+@media(max-width:360px){
+  .panel-tabs{gap:7px;padding-left:10px;padding-right:54px}.panel-tabs button{font-size:12px;padding:0 2px}
+  #history-position{flex-basis:100%;text-align:left;padding:0 4px 6px}
+  .mobile-tools-button{margin-left:auto}
+}
+@media(max-width:900px){.timeline .mobile-tools-button{width:auto;min-width:48px;padding:6px;font-size:13px;font-weight:600}}
