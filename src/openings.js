@@ -1,4 +1,5 @@
 import { Chess } from 'chess.js';
+import openingIndex from './data/opening-index.json' with { type:'json' };
 
 export const OPENINGS = [
   { id: 'random', name: 'Surprise me', description: 'A different opening, a new perspective.' },
@@ -25,10 +26,38 @@ export const OPENINGS = [
     ['e4','e6','d4','d5','Nc3','Nf6','e5','Nfd7'],
     ['e4','e6','d4','d5','e5','c5','c3','Nc6'],
     ['e4','e6','d4','d5','exd5','exd5','Nf3','Nf6'] ] },
+  { id: 'ponziani', name: 'Ponziani Opening', description: 'Support a central pawn advance with c3.', lines: [
+    ['e4','e5','Nf3','Nc6','c3','Nf6','d4','Nxe4','d5','Ne7'],
+    ['e4','e5','Nf3','Nc6','c3','d5','Qa4','f6'] ] },
+  { id: 'indian', name: 'Indian Game', description: 'Meet 1.d4 with flexible knight development.', lines: [
+    ['d4','Nf6','c4','e6','Nf3','b6','g3','Bb7','Bg2','Be7'],
+    ['d4','Nf6','c4','g6','Nc3','Bg7','e4','d6','Nf3','O-O'] ] },
+  { id: 'kings-indian', name: 'King’s Indian Defence', description: 'A kingside fianchetto against White’s centre.', lines: [
+    ['d4','Nf6','c4','g6','Nc3','Bg7','e4','d6','Nf3','O-O','Be2','e5'],
+    ['d4','Nf6','c4','g6','Nc3','Bg7','e4','d6','f3','O-O'] ] },
+  { id: 'nimzo', name: 'Nimzo-Indian Defence', description: 'Pin the knight and challenge the centre.', lines: [
+    ['d4','Nf6','c4','e6','Nc3','Bb4','e3','O-O','Bd3','d5'],
+    ['d4','Nf6','c4','e6','Nc3','Bb4','Qc2','O-O','a3','Bxc3+'] ] },
   { id: 'london', name: 'London System', description: 'A familiar setup with a clear plan.', lines: [
     ['d4','d5','Bf4','Nf6','e3','e6','Nf3','Bd6','Bg3','O-O'],
     ['d4','Nf6','Bf4','g6','e3','Bg7','Nf3','O-O','Be2','d6'] ] }
 ];
+
+const positionKey=fen=>fen.split(' ').slice(0,4).join(' ');
+export function openingAt(fen) { return openingIndex[positionKey(fen)] || null; }
+export function identifyOpening(game) {
+  const positions=[new Chess().fen(),...game.history({verbose:true}).map(m=>m.after)];
+  for(let ply=positions.length-1;ply>0;ply--){
+    const opening=openingAt(positions[ply]);
+    if(opening)return {...opening,ply,exact:ply===positions.length-1};
+  }
+  return null;
+}
+export function openingForMove(fen,uci) {
+  const game=new Chess(fen);
+  try { game.move({from:uci.slice(0,2),to:uci.slice(2,4),...(uci[4]?{promotion:uci[4]}:{})});return openingAt(game.fen()); }
+  catch { return null; }
+}
 
 export function chooseOpening(id) {
   return OPENINGS.find(o => o.id === id && o.lines) || OPENINGS[1 + Math.floor(Math.random() * (OPENINGS.length - 1))];

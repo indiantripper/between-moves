@@ -83,7 +83,7 @@ export const PATTERNS = {
   'calculation': { title:'Comparing candidate moves', tip:'Compare two or three candidates and calculate the opponent’s strongest reply.' }
 };
 export function learningSummary(games) {
-  const originals = games.flatMap(g => g.attempts || []).filter(a => !a.retry && a.grade?.label !== 'Unrated');
+  const originals = games.flatMap(g => g.attempts || []).filter(a => !a.retry && !a.inherited && a.grade?.label !== 'Unrated');
   const unassisted = originals.filter(a => !a.assisted);
   const counts = {};
   originals.forEach(a => a.explanation?.tags?.forEach(tag => { counts[tag] = (counts[tag] || 0) + 1; }));

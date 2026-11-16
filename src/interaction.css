@@ -1,0 +1,26 @@
+[hidden]{display:none!important}
+.board{touch-action:none;user-select:none;-webkit-user-select:none}
+.square .piece{pointer-events:none}
+.square.drag-source .piece{opacity:.18}
+.square.drop-target{box-shadow:inset 0 0 0 4px #e4b454}
+.drag-ghost{position:fixed;z-index:100;pointer-events:none;transform:translate(-50%,-50%);aspect-ratio:1;display:flex;align-items:center;justify-content:center}
+.drag-ghost .piece{font-size:clamp(30px,4.25vw,62px);filter:drop-shadow(0 6px 4px #102b2744)}
+.timeline{display:flex;align-items:center;gap:10px;min-height:49px;padding:6px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.timeline-buttons{display:flex;align-items:center;gap:1px}
+.timeline .icon-button{font-size:20px;padding:5px 9px}
+.timeline .icon-button:disabled{cursor:default;opacity:.25}
+#history-position{font-size:10px;color:#79866e;font-variant-numeric:tabular-nums}
+#play-from-here{margin-left:auto;font-size:10px;padding:7px 10px;white-space:nowrap;background:#e7eddf;border-color:#d4dfc8;color:#426438}
+.board-note{gap:12px;align-items:flex-start;line-height:1.7;border-top:0}
+#opening-name{flex:1;font-size:11px;font-weight:650;color:#41613d}
+#book-status{flex:1;text-align:right;font-size:9px}
+.candidate-description{flex:1;min-width:0}
+.candidate-description strong{display:block}
+.candidate-description small{display:block;font-size:9px;color:#849477;line-height:1.5;margin-top:4px;font-weight:400}
+.candidate-eval{flex-shrink:0}
+.decision-buttons .button{font-size:10px;padding:10px 8px;gap:6px}
+.opponent-reply{margin-top:19px;padding:14px;border:1px solid #e4e9da;border-radius:8px;background:#fafbf5}
+.opponent-reply>.eyebrow{font-size:8px;letter-spacing:1.3px}
+.opponent-reply>strong{float:right;font-size:15px;font-weight:650}
+.opponent-reply p{font-size:11px;line-height:1.8;color:#77856a;margin:9px 0 0}
+@media(max-width:760px){.drag-ghost .piece{font-size:clamp(28px,10vw,62px)}.timeline{gap:6px;flex-wrap:wrap}.timeline .icon-button{padding:5px 8px}#history-position{font-size:9px}#play-from-here{padding:7px;font-size:9px}.board-note{flex-direction:column;gap:3px}#book-status{text-align:left}.candidate-description small{font-size:10px}.decision-buttons .button{font-size:11px}}

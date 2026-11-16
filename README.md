@@ -24,10 +24,12 @@ With Git and GitHub CLI authenticated to the repository owner, run `npm run depl
 
 ## Behaviour
 
-- Click a piece and its legal destination. Promotion offers all four choices.
+- Drag a piece to a legal destination with a mouse or touch. Click-to-move also works. Promotion offers all four choices.
 - Coach mode compares your played move to up to five alternatives from the position **before** the move. Candidate lines can be stepped through on the board.
-- Retry preserves the first attempt and marks subsequent attempts as assisted. Continue lets the opponent respond. Turn Coach off for uninterrupted play and review later.
-- Opening choices use small curated sets of legal book lines. Leaving those lines does not imply a mistake.
+- The opponent responds automatically in both coaching modes. Retry remains available after that reply, including after a game ends.
+- The arrows below the board (or left/right keyboard arrows) step backward or forward one half-move at a time. Play from here creates a saved alternate line; dragging your piece from an earlier position does the same. An earlier position on the opponent's turn gets an automatic engine reply. Original games remain in the journal. Inherited analysis and alternate-line attempts do not inflate pattern statistics or unassisted level estimates.
+- Opening choices use curated sets of legal book lines, including Ponziani, Indian, King's Indian, Nimzo-Indian, Caro–Kann, Sicilian and London. Leaving those lines does not imply a mistake. A separate local database identifies 3,865 named opening positions (including transpositions) from the actual moves and labels candidate moves with opening names when available.
+- See strongest reply explores the engine's best continuation against your played move, independently of the selected opponent's actual response.
 - Opponent strength uses Stockfish's approximate Elo/skill controls. It is not calibrated to online ratings and is not a human-move model. Beginner settings use Skill Level because the engine's Elo control has a lower bound.
 - Level assessment is an experimental heuristic from recent unassisted engine losses. It suggests practice difficulty after 20 unassisted moves, not a verified chess rating. It updates the default for future assessment sessions.
 - Coaching reports supported facts and legal engine continuations. It does not infer an unverified positional explanation. Top-five rankings depend on search budget and device speed.
@@ -40,6 +42,7 @@ IndexedDB stores sessions, first attempts, retries, engine lines, teaching setti
 
 - Stockfish.js 19.0.1 by Nathan Rugg and Stockfish contributors: GPL-3.0. Matching source release: https://github.com/nmrugg/stockfish.js/tree/v19.0.1 (commit 0d5dd7944f88c817c07a26bc4fb1905d5f9c46d6). Matching worker/WASM files are copied unchanged from the pinned npm package at build time; COPYING is served next to them. Preserve the engine notices and source access when redistributing. Source download links and notices are in `public/THIRD-PARTY.md`.
 - chess.js 1.4.0: BSD-2-Clause. See `node_modules/chess.js/LICENSE`.
+- Opening names: Lichess chess-openings, CC0, revision `3ba6b20d31b2e6125cb0e6a2e792f400717d9d39`. See `public/OPENINGS-LICENSE.txt`. Regenerate the local opening-position index with `node scripts/update-openings.mjs` (requires network access). Source: https://github.com/lichess-org/chess-openings/tree/3ba6b20d31b2e6125cb0e6a2e792f400717d9d39.
 - Application source is GPL-3.0-or-later. See LICENSE.
 
 This first version prioritises personal study. Review hosting terms and engine/source distribution before a commercial rollout.
