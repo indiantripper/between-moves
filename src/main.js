@@ -2,13 +2,14 @@ import { Chess } from 'chess.js';
 import { Engine } from './engine.js';
 import { OPENINGS, chooseOpening, bookOptions, bookStatus, identifyOpening, openingAt, openingForMove } from './openings.js';
 import { PIECE_NAMES, uciMove, displayScore, gradeMove, explainMove, explainCandidate, sanLine } from './coach.js';
-import { openStore, readState, writeState, validateBackup } from './storage.js';
-import { positionAt, forkSession, opponentMoveAt, replaceOpponentLine, historyRows } from './timeline.js';
+import { openStore, readState, writeState } from './storage.js';
+import { positionAt, forkSession, replaceOpponentLine, historyRows } from './timeline.js';
 import { positionEvaluation, LatestPositionAnalysis } from './evaluation.js';
 import { explainOpponentMove } from './opponent-coach.js';
 import './style.css';
 import './interaction.css';
 import './readability.css';
+import { COACHING_MODES, coachingIntensity as savedIntensity, feedbackPolicy } from './coaching-intensity.js';
 import { compareMove } from './move-comparison.js';
 import './whatif.css';
 import './mobile-coach.css';
@@ -17,6 +18,7 @@ import './mobile-preview.css';
 import './mobile-quick.css';
 import './coach-popover.css';
 import './position-editor.css';
+import './coaching-intensity.css';
 import { moveDraftPiece, editedSession } from './position-editor.js';
 import { placeCoachPopover } from './coach-popover.js';
 import { moveBadge, playableChoices, pieceQualityTarget } from './quick-coach.js';
@@ -28,6 +30,7 @@ const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const glyphs = {k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
 let db, state, game = new Chess(), current, selected = null, busy = true, engineReady = false;
+let intensity='honest';
 let coachOn = true, awaiting = false, retrying = false, focus = null, preview = null, arrow = null;
 let tab = 'coach', generation = 0, flipped = false, toastTimer, saveQueue = Promise.resolve();
 let dragState=null, suppressClickUntil=0;
@@ -48,10 +51,11 @@ engine.ready.then(() => { engineReady = true; busy = false; render(); resumeSess
 $('#app').innerHTML = `
   <header class="masthead"><a class="brand" href="./" aria-label="Between Moves home"><span class="brand-mark">♞</span><span>between<span class="brand-light">moves</span><small>YOUR PERSONAL CHESS ROOM</small></span></a>
 
-    <div class="masthead-actions"><button class="icon-button top-reset" id="reset-board" aria-label="Reset board" title="Reset board · previous game stays saved"><span aria-hidden="true">↻</span><span class="reset-label">Reset</span></button><button class="button primary" id="new-game" aria-label="New practice"><span aria-hidden="true">＋</span><span class="new-practice-label">New practice</span></button><button class="icon-button tools-gear" id="board-tools" aria-label="Game tools" title="Game tools" aria-haspopup="dialog"><span aria-hidden="true">⚙︎</span></button></div></header>
+    <div class="masthead-actions"><button class="icon-button top-reset" id="reset-board" aria-label="Reset board" title="Reset board · previous game stays saved"><span aria-hidden="true">↻</span><span class="reset-label">Reset</span></button><button class="button primary" id="new-game" aria-label="New practice"><span aria-hidden="true">＋</span><span class="new-practice-label">New practice</span></button><button class="icon-button top-flip" id="flip" aria-label="Flip board" title="Flip board"><span aria-hidden="true">⇅</span></button></div></header>
   <main><div class="page-heading"><div><div class="eyebrow">A LITTLE BETTER, EVERY MOVE</div><h1>Make your next move count.</h1><p>A worthy opponent. A thoughtful coach. Your own pace.</p></div><span class="local-badge"><span></span> Saved on this device</span></div>
     <div class="workspace"><section class="play-area" aria-label="Chess game">
       <div class="player-bar"><div class="avatar opponent-avatar">♞</div><div><strong id="opponent-name">Your practice partner</strong><small id="opponent-caption">Getting the board ready</small></div><span id="engine-status" class="status-pill">Loading engine…</span><button id="mobile-best-move" class="board-best-button" aria-label="Show best move and playable alternatives" title="Best move"><span aria-hidden="true">✦</span></button></div>
+      <div class="timeline" aria-label="Game navigation"><div class="timeline-buttons"><button class="icon-button" id="history-start" aria-label="Go to start" title="Go to start">⇤</button><button class="icon-button" id="history-back" aria-label="Previous move" title="Previous move (left arrow)">←</button><button class="icon-button" id="history-next" aria-label="Next move" title="Next move (right arrow)">→</button><button class="icon-button" id="history-live" aria-label="Go to latest position" title="Go to latest position">⇥</button></div><span id="history-position">Starting position</span><label class="coaching-switch"><span class="sr-only">Coaching intensity</span><select id="coaching-intensity" aria-label="Coaching intensity">${COACHING_MODES.map(m=>`<option value="${m.id}">${m.label}</option>`).join('')}</select></label><button class="button subtle" id="review-game" title="End practice and review moves">Review</button><button class="button subtle" id="play-from-here" hidden>Play from here ↗</button></div>
       <div id="position-editor-bar" class="position-editor-bar" hidden><div><strong>Edit position</strong><p>Drag either side’s pieces freely. Your original game stays saved.</p></div><div class="position-editor-actions"><label>Side to play<select id="editor-turn"><option value="w">White</option><option value="b">Black</option></select></label><button class="button primary" id="editor-resume">Resume</button><button class="button secondary" id="editor-undo">Undo edit</button><button class="button subtle" id="editor-cancel">Cancel</button></div><small>You’ll play the selected side. Resume when your setup is ready.</small><p id="position-editor-error" role="alert" hidden></p></div>
       <div id="opponent-edit-bar" class="opponent-edit-bar" role="status" hidden></div>
       <div class="board-shell"><div class="board" id="board" role="group" aria-label="Chessboard"></div><svg id="arrows" class="arrows" viewBox="0 0 800 800" aria-hidden="true"><defs><marker id="arrowhead" markerWidth="4" markerHeight="4" refX="2.5" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4" fill="#d78d2a"/></marker></defs><g id="coach-board-lines"></g><line id="arrow-line" stroke="#d78d2a" stroke-opacity=".86" stroke-width="12" stroke-linecap="round" marker-end="url(#arrowhead)" /></svg><div id="board-quality-overlay" class="board-quality-overlay"></div></div>
@@ -59,28 +63,28 @@ $('#app').innerHTML = `
       <section id="mobile-preview-coach" class="mobile-preview-coach" aria-label="Current preview explanation" aria-live="polite" aria-atomic="true" hidden></section>
       <section id="evaluation-panel" class="evaluation-panel" aria-label="Position evaluation" hidden><div class="evaluation-scale"><span>White</span><div id="evaluation-track" class="evaluation-track" role="img" aria-label="Analysing position"><span id="white-advantage"></span></div><span>Black</span></div><div class="evaluation-caption"><strong id="evaluation-score">—</strong><span id="evaluation-headline">Analysing position…</span><button class="button subtle" id="explain-evaluation">Why?</button></div></section>
       <div class="mobile-position" id="mobile-move-names" aria-live="polite">Starting position</div>
-      <div class="player-bar bottom-player"><div class="avatar you-avatar">♙</div><div><strong>You <span id="your-color"></span></strong><small id="your-caption">Your practice, your pace</small></div><button class="icon-button" id="flip" aria-label="Flip board" title="Flip board">⇅</button><button class="button subtle" id="review-game">Review game</button><button class="button subtle" id="edit-position">Edit position</button></div>
-      <div class="timeline" aria-label="Game navigation"><div class="timeline-buttons"><button class="icon-button" id="history-start" aria-label="Go to start" title="Go to start">⇤</button><button class="icon-button" id="history-back" aria-label="Previous move" title="Previous move (left arrow)">←</button><button class="icon-button" id="history-next" aria-label="Next move" title="Next move (right arrow)">→</button><button class="icon-button" id="history-live" aria-label="Go to latest position" title="Go to latest position">⇥</button></div><span id="history-position">Starting position</span><button class="button subtle" id="change-opponent">Change opponent move</button><button class="button subtle" id="play-from-here" hidden>Play from here ↗</button></div>
-      <div class="mobile-reply-actions"><button class="button secondary" id="mobile-change-opponent">Try another reply</button><button class="button subtle" id="mobile-edit-position">Edit position</button><span id="mobile-reply-label"></span></div>
+      <div class="player-bar bottom-player"><div class="avatar you-avatar">♙</div><div><strong>You <span id="your-color"></span></strong><small id="your-caption">Your practice, your pace</small></div></div>
+
+
       <div id="preview-bar" class="preview-bar" hidden></div>
       <div class="board-note"><span id="opening-name">Opening practice</span><span id="book-status">Choose your opening</span></div>
     </section>
     <aside class="side-panel"><div class="panel-tabs"><button class="active" data-panel="coach">Coach</button><button class="mobile-top-five" data-show-five="true">Top 5</button><button data-panel="moves">Moves</button></div><div id="panel-content"></div></aside></div>
-    <footer><span>Think first. Understand next. Keep growing.</span><button id="saved-games">Saved games</button><button id="backup">Export backup</button><button id="restore">Import backup</button><button id="pgn">Export PGN</button><button id="about">About & privacy</button></footer>
+    <footer><span>Think first. Understand next. Keep growing.</span><button id="about">About & privacy</button></footer>
   </main>
   <nav class="mobile-dock" aria-label="Practice actions"><button class="mobile-ask" id="mobile-ask-coach" aria-label="Show best move" title="Best move"><span aria-hidden="true">✦</span></button><button id="mobile-back-board">↑ Back to board</button></nav>
-  <dialog id="mobile-tools"><div class="dialog-top"><h2>Game tools</h2><button class="icon-button" data-close="mobile-tools" aria-label="Close game tools">×</button></div><div class="tools-grid"><button class="button secondary" data-tool="saved-games">Saved games</button><button class="button secondary" data-tool="edit-position">Edit position</button><button class="button secondary" data-tool="reset-board">Reset board</button><button class="button secondary" data-tool="change-opponent">Change opponent move</button><button class="button secondary" data-tool="play-from-here">Play from here</button><button class="button secondary" data-tool="flip">Flip board</button><button class="button secondary" data-tool="review-game">End game & review</button><button class="button secondary" data-tool="backup">Export backup</button><button class="button secondary" data-tool="restore">Import backup</button><button class="button secondary" data-tool="pgn">Export PGN</button><button class="button secondary" data-tool="about">About & privacy</button></div><p id="mobile-opening"></p></dialog>
+
   <dialog id="setup"><form id="setup-form"><div class="dialog-top"><span class="eyebrow">A FRESH POSITION, A FRESH PERSPECTIVE</span><button type="button" class="icon-button" data-close="setup" aria-label="Close setup">×</button></div><h2>Set up your practice.</h2><p class="muted">Choose the challenge. We’ll meet you where you are.</p>
     <label>Practice mode<select name="mode"><option value="opponent">Play an opponent</option><option value="free">Free play · I move both sides</option></select><small>Free play coaches each move for White and Black.</small></label><label id="opponent-setting">Opponent target strength<input name="opponent" type="number" min="400" max="3000" step="50" value="1350" required/><small>Approximate playing strength. Your coach always uses full-strength Stockfish analysis.</small></label>
 
     <div class="field-label" id="setup-side-label">Play as</div><div class="color-options"><label><input type="radio" name="color" value="w" checked/><span>♔ <strong>White</strong><small>You make the first move</small></span></label><label><input type="radio" name="color" value="b"/><span>♚ <strong>Black</strong><small>Practise your response</small></span></label></div>
     <label>Opening<select name="opening">${OPENINGS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('')}</select><small>Curated book variations. You can leave the book at any time.</small></label>
-    <label class="check-label"><input type="checkbox" name="coach" checked/> Start with live coaching <small>Top five alternatives after your move. Switch off anytime.</small></label>
+    <label>Coaching intensity<select name="coachingIntensity">${COACHING_MODES.map(m=>`<option value="${m.id}" ${m.id==='honest'?'selected':''}>${m.label} — ${m.description}</option>`).join('')}</select><small>Change this anytime. Coaching strength stays the same.</small></label>
     <button class="button primary wide" type="submit">Let’s play <span>↗</span></button><p class="privacy-note">No account. No subscription. Your history stays in this browser.</p></form></dialog>
   <section id="piece-grade-popover" class="piece-grade-popover" popover="auto" role="dialog" aria-labelledby="piece-grade-title"></section>
   <dialog id="promotion"><h2>Promote your pawn</h2><p>Choose your new piece.</p><div class="promotion-options"></div></dialog>
   <dialog id="info"><div class="dialog-top"><span class="eyebrow">BETWEEN MOVES</span><button class="icon-button" data-close="info" aria-label="Close information">×</button></div><div id="info-body"></div></dialog>
-  <input type="file" id="backup-file" accept="application/json,.json" hidden/><div id="toast" role="status"></div>`;
+  <div id="toast" role="status"></div>`;
 
 function toast(message) { $('#toast').textContent = message; $('#toast').classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(()=>$('#toast').classList.remove('visible'),5500); }
 function handleError(error) { console.error(error); busy = false; render(); toast(error.message || 'Something went wrong. Please try again.'); }
@@ -92,11 +96,12 @@ function persist() {
 }
 function historyGame(record = current) { const g = new Chess(record?.startFen); for (const move of record?.moves || []) g.move(uciMove(move)); return g; }
 function shownGame() { if(positionEditor)return new Chess(positionEditor.fen,{skipValidation:true});return preview?.historyPly!=null?positionAt(current,preview.historyPly):preview?new Chess(preview.fen):game; }
+function restoreCoaching(record) { intensity=savedIntensity(record);coachOn=intensity!=='silent'; }
+function coaching() { return feedbackPolicy({coachingIntensity:intensity},!!current?.finished); }
 function isFreePlay() { return current?.mode==='free'; }
 function humanTurn(board=game) { return isFreePlay() || board.turn()===current?.color; }
 function moveColor() { return preview?.opponentEdit || isFreePlay()?shownGame().turn():current?.color; }
-function opponentTarget() { return !current || isFreePlay() || positionEditor || preview?.line || preview?.opponentEdit?null:opponentMoveAt(current,preview?.historyPly ?? current.moves.length); }
-function evaluationVisible() { return !!current && !positionEditor && (coachOn || current.finished); }
+function evaluationVisible() { return !!current && !positionEditor && coaching().evaluation; }
 function opponentIdeaMarkup() {
   if(isFreePlay())return '';
   if(!current || (!coachOn&&!current.finished) || preview?.line || preview?.opponentEdit)return '';
@@ -197,14 +202,6 @@ function drawBoard() {
   $('#play-from-here').hidden=preview?.historyPly==null;
   if(preview?.opponentEdit)$('#play-from-here').hidden=true;
   $('#play-from-here').disabled=busy || shown.isGameOver();
-  const target=opponentTarget();
-  $('#change-opponent').disabled=busy || !engineReady || !target;
-  $('#mobile-change-opponent').disabled=$('#change-opponent').disabled;
-  $('#mobile-change-opponent').hidden=isFreePlay();
-  $('#change-opponent').hidden=isFreePlay();
-  $('.mobile-reply-actions').hidden=!!preview?.opponentEdit;
-  $('#mobile-reply-label').textContent=isFreePlay()?'You play both sides. Drag a piece to make the next move.':target?`Replace ${target.before.split(' ')[5]}${target.color==='w'?'.':'…'} ${target.san}`:preview?.line?'Return to your position to change a reply.':'Available after your opponent moves.';
-  $('#change-opponent').title=target?`Try an alternative to ${target.before.split(' ')[5]}${target.color==='w'?'.':'…'} ${target.san}`:'Select an opponent move in Moves, or wait for the opponent to play.';
   $('#opponent-edit-bar').hidden=!preview?.opponentEdit;
   if(preview?.opponentEdit)$('#opponent-edit-bar').innerHTML=`<div><strong>What if ${shown.turn()==='w'?'White':'Black'} played something else?</strong><p>Drag an opponent piece to replace <b>${esc(preview.opponentEdit.san)}</b>. Your original game stays saved.</p></div><button class="button subtle" id="cancel-opponent-edit">Cancel</button>`;
   syncEvaluation();
@@ -234,7 +231,7 @@ function toggleGradeExplanation() {
   const popup=$('#piece-grade-popover');
   if(gradeTriggerWasOpen || popup.matches(':popover-open')){gradeTriggerWasOpen=false;closeGradePopover(true);return;}
   gradeTriggerWasOpen=false;
-  const attempt=latestOwnAttempt();if(!attempt || preview || (!coachOn&&!current?.finished))return;
+  const attempt=latestOwnAttempt();if(!attempt || preview || !coaching().grades)return;
   focus=attempt;selected=null;drawBoard();
   const anchor=$('#piece-move-grade')||$('#mobile-move-grade'),badge=moveBadge(attempt.grade);
   popup.innerHTML=`<div class="piece-grade-heading"><span class="grade-${badge.tone}"><span class="grade-disc" aria-hidden="true">${badge.symbol}</span></span><div><h3 id="piece-grade-title">${isFreePlay()?(new Chess(attempt.before).turn()==='w'?'White · ':'Black · '):''}${esc(attempt.san)} · ${esc(badge.label)}</h3></div><button id="piece-grade-close" class="icon-button" aria-label="Close explanation">×</button></div><div class="piece-grade-facts">${moveExplanationMarkup(attempt)}</div><button class="button secondary" id="piece-grade-retry" ${busy?'disabled':''}>↶ Retry this move</button>`;
@@ -248,7 +245,7 @@ function toggleGradeExplanation() {
 function paintQuickCoach() {
   const section=$('#mobile-glance'),attempt=latestOwnAttempt();
   section.hidden=!current || !!preview;
-  const visible=!positionEditor && (coachOn || current?.finished);
+  const visible=!positionEditor && coaching().grades;
   const badge=visible?moveBadge(attempt?.grade):{tone:'neutral',symbol:'○',label:'Coach off'};
   const lastOwn=current?current.moves.length-(game.turn()===current.color?1:0):0;
   const pending=visible && !!current && busy && !attempt && !!current.moves.length;
@@ -330,11 +327,6 @@ function togglePreviewExplanation() {
 function canAskCoach() {
   return !!current && !positionEditor && engineReady && !busy && coachHelp?.stage!=='loading' && !preview?.line && !preview?.opponentEdit && humanTurn(shownGame()) && !shownGame().isGameOver();
 }
-function openMobileTools() {
-  document.querySelectorAll('[data-tool]').forEach(b=>{const target=$('#'+b.dataset.tool);b.disabled=!target || target.disabled || target.hidden || (b.dataset.tool==='play-from-here' && preview?.historyPly==null);});
-  $('#mobile-opening').textContent=$('#opening-name').textContent+' · '+$('#book-status').textContent;
-  $('#mobile-tools').showModal();
-}
 function coachHelpMarkup() {
   if(!coachHelp)return '';
   const h=coachHelp;
@@ -403,6 +395,9 @@ function dismissCoachHelp() {
 function render() {
   if (!state) return;
   const active = current && !current.finished;
+  $('#coaching-intensity').value=intensity;
+  $('#coaching-intensity').title=COACHING_MODES.find(m=>m.id===intensity).description;
+  document.querySelector('[data-show-five]').hidden=!coaching().alternatives;
   if(coachHelp && (coachHelp.fen!==(preview?.coach?preview.base:shownGame().fen()) || coachHelp.gameId!==current?.id))coachHelp=null;
   $('.side-panel').dataset.coachView=mobileCoachView;
   $('#mobile-ask-coach').disabled=!canAskCoach();
@@ -416,9 +411,7 @@ function render() {
   $('#opening-name').textContent = positionEditor?'Position editor':recognised ? `${recognised.eco} · ${recognised.name}` : 'Opening not yet identified';
   $('#book-status').textContent = current ? `Practice: ${getOpening()?.name || 'Custom position'} · ${bookStatus(getOpening(),displayedGame.history())}` : 'Start a new practice';
   $('#review-game').disabled = !current || busy || !!positionEditor || current.finished;
-  for(const id of ['edit-position','mobile-edit-position'])$('#'+id).disabled=!current||busy||!!positionEditor;
   $('#new-game').disabled = !engineReady || busy || !!positionEditor;
-  $('#board-tools').disabled=!!positionEditor;
   $('#reset-board').disabled = !engineReady || busy || !current || !!positionEditor;
   document.querySelectorAll('[data-panel]').forEach(b=>b.classList.toggle('active',b.dataset.panel===tab));
   document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab==='coach'));
@@ -433,8 +426,9 @@ function render() {
   if(panelKey!==renderedPanelKey){$('#panel-content').scrollTop=0;renderedPanelKey=panelKey;}
 }
 function renderCoach(active) {
-  const f=focus;
-  let html=`<div class="coach-header"><div><span class="eyebrow">YOUR CORNER OF THE BOARD</span><h2>Let’s think it through.</h2></div><label class="toggle" title="Toggle live coaching"><input id="coach-toggle" aria-label="Toggle live coaching" type="checkbox" ${coachOn?'checked':''}/><span></span></label></div>`;
+  const f=focus, policy=coaching(),gentle=!policy.grades;
+  let html=`<div class="coach-header"><div><span class="eyebrow">YOUR CORNER OF THE BOARD</span><h2>Let’s think it through.</h2></div></div>`;
+  html+=`<p class="coaching-description">${esc(current?.finished?'Review your moves with full explanations and alternatives.':COACHING_MODES.find(m=>m.id===intensity).description)}</p>`;
   html+=`<div class="ask-coach-row"><small>Stuck? Find a move and understand its idea.</small><button class="button secondary" id="ask-coach" ${canAskCoach()?'':'disabled'}>✦ Ask coach</button></div><div class="mobile-coach-tabs"><button class="button secondary ${mobileCoachView==='coach'?'active':''}" data-coach-view="coach" aria-pressed="${mobileCoachView==='coach'}">Feedback</button><button class="button secondary ${mobileCoachView==='five'?'active':''}" data-coach-view="five" aria-pressed="${mobileCoachView==='five'}">Top 5</button></div>`;
   if(coachHelp?.quick && !preview)html+=`<div class="desktop-quick-suggestions">${$('#mobile-quick-coach').innerHTML.replaceAll('id="quick-','id="desktop-quick-').replaceAll('aria-controls="quick-','aria-controls="desktop-quick-')}</div>`;
   html+=coachHelpMarkup();
@@ -443,18 +437,18 @@ function renderCoach(active) {
     html+=`<div class="coach-empty"><span class="empty-icon">♘</span><h3>Just you and the board.</h3><p>Play freely. Your moves are saved for the review. Bring the coach back whenever you like.</p></div>`;
   } else if (f && (coachOn || !active)) {
     const grade=f.grade;
-    html+=`<div class="feedback-card severity-${grade.severity}"><div class="feedback-top"><span class="move-token">${isFreePlay()?(new Chess(f.before).turn()==='w'?'White · ':'Black · '):''}${esc(f.san)}</span><strong>${esc(grade.label)}</strong><span class="feedback-symbol">${grade.severity>=2?'?!':grade.severity===1?'?!':'✓'}</span></div>${moveExplanationMarkup(f)}<div id="opponent-idea-slot">${opponentIdeaMarkup()}</div><small>${f.inherited?'Original line · saved analysis':f.retry?'Practice variation · assisted':f.assisted?'Coached first attempt':'Unassisted first attempt'}</small></div>`;
-    html+=`</div><div class="coach-candidates"><div class="section-heading"><h3>Five ways forward</h3><span>Before your ${esc(f.san)}</span></div><div class="candidate-labels"><span>ENGINE CHOICE</span><span>WHITE EVAL.</span></div><div class="candidates">${f.lines.map((line,i)=>{
+    html+=`<div class="feedback-card ${gentle?'gentle-feedback':'severity-'+grade.severity}"><div class="feedback-top"><span class="move-token">${isFreePlay()?(new Chess(f.before).turn()==='w'?'White · ':'Black · '):''}${esc(f.san)}</span>${gentle?'<strong>The idea</strong>':`<strong>${esc(grade.label)}</strong><span class="feedback-symbol">${grade.severity>=1?'?!':'✓'}</span>`}</div>${gentle?`<p>${esc(f.actual?explainCandidate(f.before,f.actual,playerLevel()):'Analysis was interrupted. Retry the move to explore its ideas.')}</p>`:moveExplanationMarkup(f)}<div id="opponent-idea-slot">${opponentIdeaMarkup()}</div><small>${f.inherited?'Original line · saved analysis':f.retry?'Practice variation · assisted':f.assisted?'Coached first attempt':'Unassisted first attempt'}</small></div>`;
+    html+=`</div><div class="coach-candidates">${!gentle&&!current.finished?`<details class="optional-alternatives" ${mobileCoachView==='five'?'open':''}><summary>Explore five alternatives</summary>`:''}<div class="section-heading"><h3>Five ways forward</h3><span>Before your ${esc(f.san)}</span></div><div class="candidate-labels"><span>ENGINE CHOICE</span><span>WHITE EVAL.</span></div><div class="candidates">${f.lines.map((line,i)=>{
       const san=sanLine(f.before,line.pv,1)[0], mine=line.pv[0]===f.uci, opening=openingForMove(f.before,line.pv[0]);
       return `<button class="candidate ${mine?'your-move':''}" data-candidate="${i}" ${busy?'disabled':''}><span class="candidate-rank">${i+1}</span><span class="candidate-description"><span class="candidate-title"><strong>${esc(san)}</strong>${mine?'<span class="mine-label">YOUR MOVE</span>':''}</span>${opening?`<small>${esc(opening.name)}</small>`:''}</span><span class="candidate-eval">${displayScore(line,new Chess(f.before).turn())}</span><span class="candidate-arrow">↗</span></button>`;
-    }).join('')}</div><p class="analysis-note">Depth ${f.depth} · Stockfish 19 Lite · evaluations favour White when positive. Close scores can be equally playable.</p><div id="candidate-explanation">${variationExplanation()}</div>`;
-    html+=`</div><div class="coach-overview"><div class="decision-buttons"><button class="button secondary" id="retry" ${busy?'disabled':''}>↶ Retry this move</button>${f.actual?.pv?.length>1?`<button class="button secondary" id="show-punishment" ${busy?'disabled':''}>See strongest reply ↗</button>`:''}</div>`;
-    if (!f.lines.some(l=>l.pv[0]===f.uci)) html+=`<p class="analysis-note">Your move ${esc(f.san)}: ${displayScore(f.actual,new Chess(f.before).turn())}. Analysed separately from the top five.</p>`;
+    }).join('')}</div><p class="analysis-note">Depth ${f.depth} · Stockfish 19 Lite · evaluations favour White when positive. Close scores can be equally playable.</p><div id="candidate-explanation">${variationExplanation()}</div>${!gentle&&!current.finished?'</details>':''}`;
+    html+=`</div><div class="coach-overview"><div class="decision-buttons"><button class="button secondary" id="retry" ${busy?'disabled':''}>↶ Retry this move</button>${f.actual?.pv?.length>1?`<button class="button secondary" id="show-punishment" ${busy?'disabled':''}>${gentle?'Explore continuation':'See strongest reply'} ↗</button>`:''}</div>`;
+    if (!gentle && !f.lines.some(l=>l.pv[0]===f.uci)) html+=`<p class="analysis-note">Your move ${esc(f.san)}: ${displayScore(f.actual,new Chess(f.before).turn())}. Analysed separately from the top five.</p>`;
   } else {
     html+=`<div class="coach-empty"><div class="empty-board">♘<span>✦</span></div><h3>${current?'Your move. Your discovery.':'A good habit starts here.'}</h3><p>${current?'Make a move on the board. We’ll compare five possibilities, unpack the idea, and keep what you learn.':'Choose an opening and a worthy opponent. Your coach will help you understand the choices between moves.'}</p>${!current?'<button class="button primary" id="start-first">Start your first practice ↗</button>':''}</div>`;
   }
   html+='</div>';
-  if(!f || (!coachOn && active))html+='<div class="coach-candidates"><p class="muted">Top five alternatives appear after your move with coaching on. Ask coach for help with the current position.</p></div>';
+  if(!f && coachOn)html+='<div class="coach-candidates"><p class="muted">Alternatives appear after your move. Ask coach for help with the current position.</p></div>';
   html+='<div class="coach-overview">';
   if(!f && (coachOn||!active))html+=`<div id="opponent-idea-slot">${opponentIdeaMarkup()}</div>`;
   if(current && !isFreePlay() && coachOn && !preview){
@@ -471,7 +465,7 @@ function renderMoves() {
   if (!current) { $('#panel-content').innerHTML='<div class="coach-empty"><h3>Your story starts on move one.</h3><p>Start a practice to build your move history.</p></div>'; return; }
   const history=historyGame().history({verbose:true});
   let html=`<div class="panel-intro"><span class="eyebrow">${current.finished?'POST-GAME REVIEW':'YOUR GAME SO FAR'}</span><h2>Every move has a story.</h2><p>Select a move to revisit its position. Use the board arrows to go back further, then Play from here to test another line. Your original game is preserved.</p></div><div class="move-table"><div class="move-table-head"><span>#</span><span>WHITE</span><span>BLACK</span></div>`;
-  for(const row of historyRows(current)) html+=`<div class="move-row"><span>${row.number}</span>${[row.w,row.b].map(j=>{const m=j==null?null:history[j]; if(!m)return '<span></span>'; const a=[...(current.attempts||[])].reverse().find(a=>a.ply===j && a.uci===m.lan); const manual=current.overrides?.some(o=>o.ply===j&&o.uci===m.lan); return `<div class="move-cell"><button data-history="${j}" class="${a?.grade.severity>=2?'bad-move':''}">${esc(m.san)} <small>${manual?'↳':a?.grade.severity>=2?'?':a?.grade.label==='Best move'?'✓':''}</small></button>${!isFreePlay() && m.color!==current.color?`<button class="move-override" data-opponent-ply="${j}" aria-label="Change opponent move ${m.before.split(' ')[5]}${m.color==='w'?'.':'…'} ${esc(m.san)}" title="Try a different opponent move" ${busy?'disabled':''}>↺</button>`:''}</div>`;}).join('')}</div>`;
+  for(const row of historyRows(current)) html+=`<div class="move-row"><span>${row.number}</span>${[row.w,row.b].map(j=>{const m=j==null?null:history[j]; if(!m)return '<span></span>'; const a=coaching().grades?[...(current.attempts||[])].reverse().find(a=>a.ply===j && a.uci===m.lan):null; const manual=current.overrides?.some(o=>o.ply===j&&o.uci===m.lan); return `<div class="move-cell"><button data-history="${j}" class="${a?.grade.severity>=2?'bad-move':''}">${esc(m.san)} <small>${manual?'↳':a?.grade.severity>=2?'?':a?.grade.label==='Best move'?'✓':''}</small></button></div>`;}).join('')}</div>`;
   html+='</div>';
   if (!history.length) html+='<p class="muted panel-intro">Make your first move to begin.</p>';
   if (current.finished) {
@@ -479,10 +473,6 @@ function renderMoves() {
     html+=`<div class="review-banner"><strong>${attempts.length} decisions · ${mistakes.length} moments to revisit</strong><p>${mistakes.length?'Start with the marked moves. Their coaching explains the engine alternatives.':'Explore your moves and compare their candidate lines.'}</p></div>`;
   }
   $('#panel-content').innerHTML=html;
-}
-function showSavedGames() {
-  $('#info-body').innerHTML=`<h2>Saved games</h2><p>Stored only in this browser. Edited positions and original games stay separate.</p>${state.games.slice().reverse().map(g=>`<button class="journal-entry" data-game="${esc(g.id)}"><span><strong>${esc(OPENINGS.find(o=>o.id===g.opening)?.name || (g.startFen?'Edited position':'Practice'))}</strong><small>${new Date(g.created).toLocaleDateString()} · ${g.mode==='free'?'Both sides':g.color==='w'?'White':'Black'} · ${g.moves.length} moves in history</small></span><span>${g.finished?'Review ↗':'Resume ↗'}</span></button>`).join('')||'<p>No saved games yet.</p>'}`;
-  $('#info').showModal();
 }
 function updateSetupMode() {
   const free=$('#setup-form').elements.mode.value==='free';
@@ -495,6 +485,7 @@ function updateSetupMode() {
 $('#setup-form').elements.mode.addEventListener('change',updateSetupMode);
 function setup() {
   const form=$('#setup-form'), settings=state.settings;
+  form.elements.coachingIntensity.value=savedIntensity(settings);
   form.elements.mode.value=settings.mode==='free'?'free':'opponent';
   updateSetupMode();
   form.elements.opponent.value=settings.opponent;
@@ -506,11 +497,11 @@ async function startGame(event) {
   event.preventDefault();
   if(busy || !engineReady) return;
   const values=new FormData(event.target), opening=chooseOpening(values.get('opening'));
-  state.settings={mode:values.get('mode'),level:Number(values.get('opponent')),opponent:Number(values.get('opponent')),color:values.get('color'),opening:values.get('opening'),assess:false};
+  state.settings={mode:values.get('mode'),coachingIntensity:values.get('coachingIntensity'),level:Number(values.get('opponent')),opponent:Number(values.get('opponent')),color:values.get('color'),opening:values.get('opening'),assess:false};
   if(current && !current.finished) { current.finished=true; current.result='Practice paused for a new game'; }
   const assess=false;
-  current={id:crypto.randomUUID(),created:new Date().toISOString(),mode:values.get('mode'),color:values.get('color'),opening:opening.id,level:Number(values.get('opponent')),opponent:Number(values.get('opponent')),assess,moves:[],attempts:[],finished:false,coach:values.has('coach')};
-  state.games.push(current); state.active=current.id; game=new Chess(); coachOn=current.coach; flipped=current.color==='b';
+  current={id:crypto.randomUUID(),created:new Date().toISOString(),mode:values.get('mode'),coachingIntensity:values.get('coachingIntensity'),color:values.get('color'),opening:opening.id,level:Number(values.get('opponent')),opponent:Number(values.get('opponent')),assess,moves:[],attempts:[],finished:false,coach:values.get('coachingIntensity')!=='silent'};
+  state.games.push(current); state.active=current.id; game=new Chess(); restoreCoaching(current); flipped=current.color==='b';
   generation++; awaiting=false; retrying=false; focus=null; preview=null; arrow=null; selected=null; tab='coach';
   $('#setup').close(); await persist(); render();
   if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
@@ -520,10 +511,10 @@ async function resetBoard() {
   if(busy || !engineReady || !current)return;
   const {color,opening,level,opponent,mode,startFen}=current;
   if(!current.finished){current.finished=true;current.result='Board reset · previous practice saved';}
-  current={id:crypto.randomUUID(),created:new Date().toISOString(),color,opening,level,opponent,mode,assess:false,coach:coachOn,...(startFen?{startFen}:{}),moves:[],attempts:[],finished:false};
+  current={id:crypto.randomUUID(),created:new Date().toISOString(),color,opening,level,opponent,mode,assess:false,coachingIntensity:intensity,coach:coachOn,...(startFen?{startFen}:{}),moves:[],attempts:[],finished:false};
   state.games.push(current);state.active=current.id;game=new Chess(startFen);flipped=color==='b';
   generation++;awaiting=false;retrying=false;focus=null;preview=null;arrow=null;selected=null;tab='coach';
-  await persist();render();toast('Board reset. Your previous game is saved in Saved games in Tools.');
+  await persist();render();toast('Board reset. Ready for a fresh start.');
   if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
   if(color==='b')opponentTurn();
 }
@@ -617,15 +608,6 @@ function navigateHistory(ply) {
   render();
 }
 function stepHistory(delta) { navigateHistory((preview?.historyPly ?? current?.moves.length ?? 0)+delta); }
-function changeOpponentMove(ply=null) {
-  if(busy || !engineReady || !current)return;
-  const target=ply==null?opponentTarget():historyGame().history({verbose:true})[ply];
-  if(!target || target.color===current.color)return;
-  const index=ply==null?target.ply:ply;
-  preview={fen:target.before,historyPly:index,opponentEdit:{ply:index,san:target.san,uci:target.lan},label:`Choose an alternative to ${target.before.split(' ')[5]}${target.color==='w'?'.':'…'} ${target.san}`};
-  selected=null;arrow=null;render();
-  if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
-}
 async function applyOpponentReplacement(from,to,promotion=null) {
   if(busy || !preview?.opponentEdit)return;
   const legal=shownGame().moves({square:from,verbose:true}).filter(m=>m.to===to);
@@ -635,7 +617,7 @@ async function applyOpponentReplacement(from,to,promotion=null) {
     const edit=preview.opponentEdit;
     const branch=replaceOpponentLine(current,edit.ply,`${from}${to}${promotion||''}`,crypto.randomUUID());
     current=branch;state.games.push(branch);state.active=branch.id;game=historyGame();generation++;
-    coachOn=branch.coach??true;awaiting=false;retrying=true;preview=null;arrow=null;selected=null;focus=branch.attempts.at(-1)||null;tab='coach';
+    restoreCoaching(branch);awaiting=false;retrying=true;preview=null;arrow=null;selected=null;focus=branch.attempts.at(-1)||null;tab='coach';
     if(game.isGameOver())finishGame(terminalResult());
     await persist();render();toast(`What if ${branch.overrides.at(-1).san}? Your original game is saved. It’s your turn to respond.`);
     if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
@@ -645,8 +627,8 @@ function forkFromHistory(autoReply=true) {
   if(busy || preview?.historyPly==null || new Chess(preview.fen).isGameOver())return;
   const branch=forkSession(current,preview.historyPly,crypto.randomUUID());
   current=branch;state.games.push(branch);state.active=branch.id;game=historyGame();generation++;
-  coachOn=branch.coach??true;awaiting=false;retrying=true;preview=null;arrow=null;selected=null;focus=branch.attempts.at(-1)||null;tab='coach';
-  persist();render();toast('Alternate line started. Your original game is saved in Saved games in Tools.');
+  restoreCoaching(branch);awaiting=false;retrying=true;preview=null;arrow=null;selected=null;focus=branch.attempts.at(-1)||null;tab='coach';
+  persist();render();toast('Alternate line started. Your original game is saved in this device.');
   if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
   if(autoReply && game.turn()!==current.color)opponentTurn();
 }
@@ -665,32 +647,9 @@ function viewHistory(index) {
   if(attempt){ focus=attempt; tab='coach'; } render();
   if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
 }
-function download(name,data,type='application/json') { const url=URL.createObjectURL(new Blob([data],{type})); const a=document.createElement('a'); a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000); }
-function exportBackup() { download(`between-moves-backup-${new Date().toISOString().slice(0,10)}.json`,JSON.stringify(state,null,2)); toast('Backup exported. Keep it to restore your history or move devices.'); }
-function exportPgn() {
-  if(!current){toast('Play a game first.');return;} const g=historyGame(); g.setHeader('Event','Between Moves practice','White',isFreePlay()?'You (White)':current.color==='w'?'You':`Engine target ${current.opponent}`,'Black',isFreePlay()?'You (Black)':current.color==='b'?'You':`Engine target ${current.opponent}`,'Opening',getOpening()?.name||'Custom position','Result',game.isCheckmate()?(game.turn()==='w'?'0-1':'1-0'):game.isDraw()?'1/2-1/2':'*');
-  download('between-moves.pgn',g.pgn(),'application/x-chess-pgn');
-}
-async function importBackup(file) {
-  if(!file)return;
-  if(file.size>30*1024*1024)throw Error('Please import a backup smaller than 30 MB.');
-  const incoming=validateBackup(JSON.parse(await file.text()));
-  // Validate legal game histories before merging. Existing records always win on duplicate IDs.
-  for(const record of incoming.games) { historyGame(record); for(const attempt of record.attempts) { new Chess(attempt.before); if(!Array.isArray(attempt.lines)||!Array.isArray(attempt.explanation?.facts)||!Array.isArray(attempt.explanation?.tags)||typeof attempt.grade?.severity!=='number')throw Error('A coaching record in this backup is invalid.'); } }
-  const wasEmpty=state.games.length===0;
-  const ids=new Set(state.games.map(g=>g.id)); let count=0;
-  incoming.games.forEach(g=>{if(!ids.has(g.id)){state.games.push(g);ids.add(g.id);count++;}});
-  if(wasEmpty){
-    const s=incoming.settings;
-    state.settings={mode:s.mode==='free'?'free':'opponent',level:Number(s.level)||1350,opponent:Number(s.opponent)||1350,color:s.color==='b'?'b':'w',opening:OPENINGS.some(o=>o.id===s.opening)?s.opening:'random',assess:false};
-    state.active=state.games.some(g=>g.id===incoming.active)?incoming.active:state.games.at(-1)?.id;
-    if(state.active)openRecord(state.active);
-  }
-  await persist();render();toast(`Imported ${count} practice sessions. Your existing history was kept.`);
-}
 function openRecord(id) {
   if(busy)return; const record=state.games.find(g=>g.id===id);if(!record)return;
-  current=record;game=historyGame();state.active=id;coachOn=current.coach ?? true;flipped=current.color==='b';focus=current.attempts.at(-1)||null;
+  current=record;game=historyGame();state.active=id;restoreCoaching(current);flipped=current.color==='b';focus=current.attempts.at(-1)||null;
   awaiting=false;
   preview=null;arrow=null;selected=null;retrying=!!current.retrying;tab=current.finished?'moves':'coach';generation++;persist();render();
   if(matchMedia('(max-width:900px)').matches)scrollToSection(current.finished?'moves':'board');
@@ -731,7 +690,7 @@ function cancelPositionEditor() {
 async function resumeEditedPosition() {
   if(!positionEditor)return;
   try{
-    const record=editedSession({...current,coach:coachOn},positionEditor.fen,positionEditor.turn,crypto.randomUUID());
+    const record=editedSession({...current,coachingIntensity:intensity,coach:coachOn},positionEditor.fen,positionEditor.turn,crypto.randomUUID());
     positionEditor=null;current=record;state.games.push(record);state.active=record.id;game=historyGame();generation++;
     preview=null;coachHelp=null;arrow=null;selected=null;focus=null;awaiting=false;retrying=true;tab='coach';flipped=current.color==='b';
     if(game.isGameOver())finishGame(terminalResult());
@@ -826,7 +785,6 @@ window.addEventListener('blur',()=>{if(dragState)releaseDrag({pointerId:dragStat
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b || b.disabled)return;
   if(positionEditor && !['editor-resume','editor-undo','editor-cancel','flip'].includes(b.id)){toast('Resume or cancel your position edits first.');return;}
-  if(b.dataset.tool){$('#mobile-tools').close();$('#'+b.dataset.tool)?.click();return;}
   if(b.dataset.showFive){tab='coach';mobileCoachView='five';render();return;}
   if(b.dataset.coachView){mobileCoachView=b.dataset.coachView;render();return;}
   if(b.dataset.close){$('#'+b.dataset.close).close();return;}
@@ -840,23 +798,25 @@ document.addEventListener('click',e=>{
   if(b.dataset.tab){tab=b.dataset.tab;mobileDestination=tab;render();return;} if(b.dataset.panel){tab=b.dataset.panel;if(tab==='coach')mobileCoachView='coach';mobileDestination=tab;render();return;}
   if(b.dataset.candidate!=null){showCandidate(Number(b.dataset.candidate));return;}
   if(b.dataset.history!=null){viewHistory(Number(b.dataset.history));return;} if(b.dataset.game){$('#info').close();openRecord(b.dataset.game);return;}
-  if(b.dataset.opponentPly!=null){changeOpponentMove(Number(b.dataset.opponentPly));return;}
-  const actions={ 'saved-games':showSavedGames,'edit-position':startPositionEditor,'mobile-edit-position':startPositionEditor,'editor-resume':resumeEditedPosition,'editor-undo':undoPositionEdit,'editor-cancel':cancelPositionEditor,'piece-grade-close':()=>closeGradePopover(true),'piece-grade-retry':()=>{closeGradePopover();retryMove();},'piece-move-grade':toggleGradeExplanation,'mobile-move-grade':toggleGradeExplanation,'desktop-grade-retry':retryMove,'mobile-grade-retry':retryMove,'mobile-best-move':()=>askCoach({direct:true}),'quick-choice-back':()=>chooseQuickAlternative(-1),'quick-choice-next':()=>chooseQuickAlternative(1),'quick-close':()=>{if(coachHelp){coachHelp.quick=false;coachHelp.quickDetails=false;}arrow=null;render();},'quick-choice-why':()=>{if(coachHelp)coachHelp.quickDetails=!coachHelp.quickDetails;render();},'quick-choice-preview':()=>previewCoachMove(1),'quick-choice-play':playCoachMove,'mobile-preview-back':()=>stepPreview(-1),'mobile-preview-next':()=>stepPreview(1),'mobile-preview-return':returnToGame,'mobile-preview-details':togglePreviewExplanation,'ask-coach':askCoach,'mobile-ask-coach':()=>askCoach({direct:true}),'coach-show-move':()=>revealCoachMove(),'coach-preview-move':()=>previewCoachMove(1),'coach-preview-reply':()=>previewCoachMove(2),'coach-play-move':playCoachMove,'coach-dismiss':dismissCoachHelp,'coach-retry-help':()=>{coachHelp=null;askCoach();},'mobile-back-board':()=>scrollToSection('board'),'mobile-change-opponent':()=>changeOpponentMove(),'board-tools':openMobileTools,'mobile-game-tools':openMobileTools,'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
-    'exit-preview':returnToGame,'cancel-opponent-edit':returnToGame,'change-opponent':changeOpponentMove,'explain-evaluation':explainEvaluation,'retry-evaluation':()=>{$('#info').close();positionAnalysis.retry(shownGame().fen());},'line-back':()=>stepPreview(-1),'line-next':()=>stepPreview(1),'history-start':()=>navigateHistory(0),'history-back':()=>stepHistory(-1),'history-next':()=>stepHistory(1),'history-live':returnToGame,'play-from-here':forkFromHistory,'show-punishment':showPlayedLine,backup:exportBackup,restore:()=>$('#backup-file').click(),pgn:exportPgn,
+  const actions={ 'editor-resume':resumeEditedPosition,'editor-undo':undoPositionEdit,'editor-cancel':cancelPositionEditor,'piece-grade-close':()=>closeGradePopover(true),'piece-grade-retry':()=>{closeGradePopover();retryMove();},'piece-move-grade':toggleGradeExplanation,'mobile-move-grade':toggleGradeExplanation,'desktop-grade-retry':retryMove,'mobile-grade-retry':retryMove,'mobile-best-move':()=>askCoach({direct:true}),'quick-choice-back':()=>chooseQuickAlternative(-1),'quick-choice-next':()=>chooseQuickAlternative(1),'quick-close':()=>{if(coachHelp){coachHelp.quick=false;coachHelp.quickDetails=false;}arrow=null;render();},'quick-choice-why':()=>{if(coachHelp)coachHelp.quickDetails=!coachHelp.quickDetails;render();},'quick-choice-preview':()=>previewCoachMove(1),'quick-choice-play':playCoachMove,'mobile-preview-back':()=>stepPreview(-1),'mobile-preview-next':()=>stepPreview(1),'mobile-preview-return':returnToGame,'mobile-preview-details':togglePreviewExplanation,'ask-coach':askCoach,'mobile-ask-coach':()=>askCoach({direct:true}),'coach-show-move':()=>revealCoachMove(),'coach-preview-move':()=>previewCoachMove(1),'coach-preview-reply':()=>previewCoachMove(2),'coach-play-move':playCoachMove,'coach-dismiss':dismissCoachHelp,'coach-retry-help':()=>{coachHelp=null;askCoach();},'mobile-back-board':()=>scrollToSection('board'),'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
+    'exit-preview':returnToGame,'cancel-opponent-edit':returnToGame,'explain-evaluation':explainEvaluation,'retry-evaluation':()=>{$('#info').close();positionAnalysis.retry(shownGame().fen());},'line-back':()=>stepPreview(-1),'line-next':()=>stepPreview(1),'history-start':()=>navigateHistory(0),'history-back':()=>stepHistory(-1),'history-next':()=>stepHistory(1),'history-live':returnToGame,'play-from-here':forkFromHistory,'show-punishment':showPlayedLine,
     'review-moves':()=>{tab='moves';render();},'review-game':()=>{if(!current||busy)return;finishGame();tab='moves';persist();render();},about:()=>{
-      $('#info-body').innerHTML='<h2>A practice room of your own.</h2><p>Between Moves runs chess analysis on your device using Stockfish 19 Lite. Coaching uses programmed rules and verified engine continuations, with no AI API.</p><p>Games, retries, and learning history are stored in this browser using IndexedDB. No accounts, analytics, or game uploads. Your host still handles ordinary website requests.</p><p>Clearing browser data can erase history. Export backups regularly, and before switching domains, browsers, or devices. Import merges sessions without replacing existing records.</p><p>Opponent ratings are approximate targets. Positional explanations and practice book lines have limited coverage. Opening recognition uses the local Lichess opening-name database (CC0).</p><p>Stockfish.js is distributed under GPLv3. <a href="https://github.com/nmrugg/stockfish.js/tree/v19.0.1" target="_blank" rel="noreferrer">Engine source</a> · <a href="./engine/COPYING.txt" target="_blank">Engine licence</a>. Chess rules by chess.js (BSD-2-Clause).</p>';
+      $('#info-body').innerHTML='<h2>A practice room of your own.</h2><p>Between Moves runs chess analysis on your device using Stockfish 19 Lite. Coaching uses programmed rules and verified engine continuations, with no AI API.</p><p>Games, retries, and learning history are stored in this browser using IndexedDB. No accounts, analytics, or game uploads. Your host still handles ordinary website requests.</p><p>Games stay in this browser. Clearing browser data or changing browsers or devices won’t carry them over.</p><p>Opponent ratings are approximate targets. Positional explanations and practice book lines have limited coverage. Opening recognition uses the local Lichess opening-name database (CC0).</p><p>Stockfish.js is distributed under GPLv3. <a href="https://github.com/nmrugg/stockfish.js/tree/v19.0.1" target="_blank" rel="noreferrer">Engine source</a> · <a href="./engine/COPYING.txt" target="_blank">Engine licence</a>. Chess rules by chess.js (BSD-2-Clause).</p>';
       $('#info').showModal();
     }
   }; actions[b.id.replace(/^desktop-quick-/,'quick-')]?.();
 });
 document.addEventListener('change',e=>{
   if(e.target.id==='editor-turn' && positionEditor){positionEditor.turn=e.target.value;$('#editor-resume').textContent=`Resume · ${e.target.value==='w'?'White':'Black'} to play`;}
-  if(e.target.id==='coach-toggle'){
-    coachOn=e.target.checked;if(current)current.coach=coachOn;
-    persist();render();
+  if(e.target.id==='coaching-intensity'){
+    intensity=e.target.value;coachOn=intensity!=='silent';
+    if(current){current.coachingIntensity=intensity;current.coach=coachOn;}
+    state.settings.coachingIntensity=intensity;
+    closeGradePopover();coachHelp=null;arrow=null;
+    if(preview?.line)preview=null;
+    mobileCoachView='coach';persist();render();
   }
 });
-$('#backup-file').addEventListener('change',e=>{if(busy){toast('Wait for the current move to finish before importing.');return;}importBackup(e.target.files[0]).catch(handleError).finally(()=>e.target.value='');});
 document.addEventListener('pointerdown',e=>{gradeTriggerWasOpen=!!e.target.closest('#piece-move-grade,#mobile-move-grade') && $('#piece-grade-popover').matches(':popover-open');},true);
 $('#piece-grade-popover').addEventListener('toggle',e=>{if(e.newState==='closed'){mobileGradeOpen=false;for(const b of document.querySelectorAll('[aria-controls="piece-grade-popover"]'))b.setAttribute('aria-expanded','false');}});
 window.addEventListener('scroll',()=>closeGradePopover(),{passive:true});
@@ -865,9 +825,9 @@ document.addEventListener('keydown',e=>{if(positionEditor){if(e.key==='Escape')c
 try {
   db=await openStore();state=await readState(db);
   const active=state.games.find(g=>g.id===state.active);
-  if(active){current=active;game=historyGame();coachOn=current.coach??true;flipped=current.color==='b';focus=current.attempts.at(-1)||null;retrying=!!current.retrying;awaiting=false;}
+  if(active){current=active;game=historyGame();restoreCoaching(current);flipped=current.color==='b';focus=current.attempts.at(-1)||null;retrying=!!current.retrying;awaiting=false;}
   render();resumeSession();
   if(!state.games.length)setup();
 } catch(error) {
-  state={version:1,games:[],settings:{level:1350,opponent:1350,color:'w',opening:'random'}};render();toast('Browser storage is unavailable. You can play, but export backups to keep your history.');
+  state={version:1,games:[],settings:{level:1350,opponent:1350,color:'w',opening:'random'}};render();toast('Browser storage is unavailable. You can play, but your game will not be saved.');
 }

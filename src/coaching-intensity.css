@@ -1,0 +1,35 @@
+/* A single, persistent control replaces the live-coaching toggle. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.timeline .coaching-switch{display:flex;align-items:center;margin:0 0 0 auto;flex-shrink:0}
+.coaching-switch select{width:100px;min-height:44px;margin:0;padding:7px 9px;font-size:14px;font-weight:600;color:#214d40;border:1px solid #dce3d4;border-radius:8px;background:#f3f5ee;cursor:pointer}
+.coaching-description{font-size:13px;line-height:1.6;color:#67765e;margin:0 0 16px}
+.optional-alternatives{border-top:1px solid #e0e5d8;margin:18px 0 0;padding-top:4px}
+.optional-alternatives>summary{font-size:14px;font-weight:600;padding:12px 0;cursor:pointer;color:#305441}
+.optional-alternatives .section-heading{margin-top:10px}
+.gentle-feedback{background:#f5f7ef;border-color:#dfe5d7}
+.masthead-actions .top-flip{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;min-height:44px;padding:0;border:1px solid #dce2d5;border-radius:9px;background:#f0f3e9;font-size:25px}
+.timeline #review-game{margin-left:auto;min-height:44px;padding:6px 10px;font-size:13px}
+@media(max-width:900px){
+  .panel-tabs{padding:0 12px;gap:14px}
+  .timeline .coaching-switch{margin-left:auto}
+  .coaching-switch select{width:96px;min-height:40px;font-size:13px}
+  #panel-content .coach-header{display:none}
+  .coaching-description{font-size:13px;line-height:1.6;margin-bottom:12px}
+  .timeline #play-from-here{display:inline-flex;min-height:44px;font-size:13px}
+}
+@media(max-width:360px){.panel-tabs{gap:10px;padding:0 10px}.coaching-switch select{width:88px;padding-left:7px}}
+
+.timeline{margin:0 0 9px;padding:0;border:0;align-items:center;gap:6px;flex-wrap:wrap}
+.timeline .coaching-switch{margin-left:auto}
+.timeline #review-game{margin-left:0}
+@media(max-width:900px){
+  .timeline{min-height:44px;margin:0 0 8px;flex-wrap:nowrap;gap:4px}
+  .timeline-buttons .icon-button{width:36px;min-width:36px;height:40px;min-height:40px;font-size:22px}
+  .timeline #history-position{display:none}
+  .timeline #review-game{min-height:40px;padding:6px;font-size:12px}
+  .timeline .coaching-switch{margin-left:auto}
+  .timeline #play-from-here{position:absolute;top:100%;right:0;z-index:8;background:#fffefa;border:1px solid #dce2d5;box-shadow:0 3px 12px #29423618}
+  .timeline{position:relative}
+}
+
+@media(max-width:360px){.timeline-buttons .icon-button{width:32px;min-width:32px}.timeline #review-game{padding:6px 5px}}
