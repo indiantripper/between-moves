@@ -21,7 +21,7 @@ export function coachSuggestion(fen,line,level=1350) {
   guarded.sort((a,b)=>Number(before.isAttacked(b.square,enemy))-Number(before.isAttacked(a.square,enemy)));
   if(guarded[0])idea+=before.isAttacked(guarded[0].square,enemy)?` It adds a defender to your ${PIECE_NAMES[guarded[0].type]} on ${guarded[0].square}, which is under attack.`:` It supports your central pawn on ${guarded[0].square}.`;
   const targets=after.board().flat().filter(p=>p && p.color!==move.color && p.type!=='k' && after.attackers(p.square,move.color).includes(move.to));
-  if(!move.captured && !after.isCheck() && targets.length)idea+=` From ${move.to}, your ${PIECE_NAMES[move.piece]} attacks ${targets.map(p=>`the ${PIECE_NAMES[p.type]} on ${p.square}`).join(' and ')}.`;
+  if(!move.captured && !after.isCheck() && targets.length && !idea.includes('attacks'))idea+=` From ${move.to}, your ${PIECE_NAMES[move.piece]} attacks ${targets.map(p=>`the ${PIECE_NAMES[p.type]} on ${p.square}`).join(' and ')}.`;
   const controlled=['d4','e4','d5','e5'].filter(square=>after.attackers(square,move.color).includes(move.to));
   if(controlled.length && !guarded.length && !move.captured && !after.isCheck())idea+=` It controls ${controlled.join(' and ')} in the centre.`;
   if(move.piece==='p' && !controlled.length && !move.captured){

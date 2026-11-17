@@ -37,10 +37,11 @@ test('engine follow-ups are legal, conditional English and tied to the exact pos
   const analysis={fen:after.fen(),line:{cp:25,pv:['g1f3','b8c6']}};
   const idea=explainOpponentMove({...args,analysis});
   assert.equal(idea.plan,'If you move your knight to f3, Black could move its knight to c6.');
+  assert.deepEqual(idea.planPreview,{fen:after.fen(),pv:['g1f3','b8c6'],reply:'Nf3',followup:'Nc6'});
   const stale=explainOpponentMove({...args,analysis:{...analysis,fen:before.fen()}});
-  assert.doesNotMatch(stale.plan,/If you/);
+  assert.doesNotMatch(stale.plan,/If you/);assert.equal(stale.planPreview,null);
   const invalid=explainOpponentMove({...args,analysis:{...analysis,line:{pv:['a1a8','b8c6']}}});
-  assert.doesNotMatch(invalid.plan,/If you/);
+  assert.doesNotMatch(invalid.plan,/If you/);assert.equal(invalid.planPreview,null);
 });
 test('also explains White as the opponent, and rejects illegal moves',()=>{
   const white=ideaFor(['d4','Nf6','Nf3']);assert.equal(white.side,'White');assert.match(white.reason,/White/);

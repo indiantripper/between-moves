@@ -17,7 +17,7 @@ test('moving the only defender explains the capture it permits',()=>{
 });
 test('unknown positional reasons remain explicit while engine evidence stays available',()=>{
   const c=compareMove(attempt(new Chess().fen(),['a2a3','e7e5'],['g1f3','d7d5']));
-  assert.equal(c.uncertain,true);assert.equal(c.cause,'');assert.match(c.cost,/0.55/);assert.ok(c.reply);
+  assert.equal(c.uncertain,true);assert.match(c.cause,/does not reveal a clear material loss or tactical reason/);assert.match(c.cost,/0.55/);assert.ok(c.reply);
   assert.equal(compareMove(attempt(new Chess().fen(),['a2a5'],['g1f3'])),null);
 });
 test('Black evaluation loss is mover-relative and displayed scores are White-relative',()=>{
@@ -43,4 +43,18 @@ test('missing a defence explains the actual capture and the best move’s protec
   const g=new Chess();for(const san of ['e4','e5','Nf3'])g.move(san);
   const c=compareMove(attempt(g.fen(),['b8a6','f3e5'],['b8c6','f1c4'],-180,-20));
   assert.match(c.cause,/e5 without a defender/);assert.match(c.bestIdea,/defender.*e5/);
+});
+
+test('a quiet defence still explains the double attack missed by a checking move',()=>{
+  const c=compareMove(attempt('3qk3/8/8/8/8/5N2/4P3/R5K1 b - - 0 1',['d8b6','e2e3'],['d8f6','e2e3'],-300,200));
+  assert.match(c.cause,/misses a double attack/);assert.match(c.cause,/knight on f3/);assert.match(c.cause,/rook on a1/);assert.equal(c.uncertain,false);
+});
+test('an immediate mating reply is named explicitly in the reason',()=>{
+  const g=new Chess();g.move('f3');g.move('e5');
+  const a=attempt(g.fen(),['g2g4','d8h4'],['e2e4','f8c5']);a.actual.mate=-1;a.grade.severity=3;
+  assert.match(compareMove(a).cause,/g4 allows Qh4#: your king has no legal escape/);
+});
+test('a line ending at a capture does not claim a settled material loss',()=>{
+  const c=compareMove(attempt(new Chess().fen(),['f2f3','e7e5','e2e3','d7d5','d2d4','e5d4'],['e2e4','e7e5']));
+  assert.doesNotMatch(c.cause,/lose more material/);assert.equal(c.uncertain,true);
 });

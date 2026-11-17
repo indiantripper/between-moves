@@ -38,7 +38,7 @@ export function explainOpponentMove({before,uci,previousMove=null,analysis=null,
   const side=name(move.color),enemy=move.color==='w'?'b':'w',piece=PIECE_NAMES[move.piece];
   const threats=after.board().flat().filter(p=>p&&p.color===enemy&&after.attackers(p.square,move.color).includes(move.to)&&!prior.attackers(p.square,move.color).includes(move.from)).sort((a,b)=>VALUE[b.type]-VALUE[a.type]);
   const pin=pinBehind(after,move),valuable=threats.filter(p=>p.type!=='p');
-  let reason='',plan='',watch='';
+  let reason='',plan='',watch='',planPreview=null;
   if(after.isCheckmate())return {side,san:move.san,reason:`${side} gives checkmate: your king has no legal escape.`,plan:'The mating attack has finished the game.',watch:''};
   if(pin){
     reason=`${side} lines up the ${piece} with ${targetName(pin.piece)} and your ${pin.behind} behind it.`;
@@ -117,10 +117,11 @@ export function explainOpponentMove({before,uci,previousMove=null,analysis=null,
       try{
         const response=continuation.move(uciMove(analysis.line.pv[0])),followup=continuation.move(uciMove(analysis.line.pv[1]));
         plan=`If you ${plainMove(response,'your')}, ${side} could ${plainMove(followup,'its')}.`;
+        planPreview={fen:after.fen(),pv:[response.lan,followup.lan],reply:response.san,followup:followup.san};
       }catch{/* Keep the supported general idea when the supplied line is incomplete or illegal. */}
     }
   }
   if(!watch&&threats[0]&&after.attackers(threats[0].square,enemy).length===0&&threats[0].type!=='k')watch=`Your ${PIECE_NAMES[threats[0].type]} on ${threats[0].square} is attacked and has no defender.`;
   if(after.isCheck())watch='Your king is in check; your next move must answer it.';
-  return {side,san:move.san,reason,plan,watch};
+  return {side,san:move.san,reason,plan,watch,planPreview};
 }

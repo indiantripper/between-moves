@@ -49,7 +49,7 @@ let mobileDestination='board';
 let renderedPanelKey=null;
 let positionEditor=null, gradeTriggerWasOpen=false;
 let mobileGradeOpen=false, mobileGradeKey=null;
-let coachHelp=null, mobileCoachView='coach', mobilePreviewExpanded=false;
+let coachHelp=null, mobileCoachView='coach', mobilePreviewExpanded=false,opponentExpandedKey=null;
 const engine = new Engine(`${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`);
 let meterEngine=null;
 const positionAnalysis=new LatestPositionAnalysis(async fen=>{
@@ -120,10 +120,12 @@ function opponentIdeaMarkup() {
   const cached=positionAnalysis.cache.get(move.after)?.analysis;
   const idea=explainOpponentMove({before:move.before,uci:move.lan,previousMove:history[index-1],analysis:cached?{...cached,fen:move.after}:null,level:playerLevel()});
   if(!idea)return '';
-  const content=`<div class="opponent-idea"><span class="opponent-idea-label">${next?`NEXT ${idea.side.toUpperCase()} REPLY`:`${idea.side.toUpperCase()}’S IDEA`} · ${esc(idea.san)}</span><p>${esc(idea.reason)}</p><p><strong>Possible plan:</strong> ${esc(idea.plan)}</p>${idea.watch?`<p class="opponent-idea-watch"><strong>Watch:</strong> ${esc(idea.watch)}</p>`:''}</div>`;
-  return focus?`<details class="opponent-context"><summary>${idea.side}’s last move · ${esc(idea.san)}</summary>${content}</details>`:content;
+  const planVisual=idea.planPreview?`<div class="opponent-plan-visual"><div><small>One possible continuation</small><p>You: <strong>${esc(idea.planPreview.reply)}</strong><br>${idea.side}: <strong>${esc(idea.planPreview.followup)}</strong></p></div>${miniLineMarkup(idea.planPreview.fen,idea.planPreview.pv,flipped,{initial:2,arrows:true})}</div>`:`<div class="opponent-plan-visual"><div><small>Their last move</small><p>${esc(moveInWords(move))}</p></div>${miniLineMarkup(move.before,[move.lan],flipped,{arrows:true})}</div>`;
+  const content=`<div class="opponent-idea"><span class="opponent-idea-label">${next?`NEXT ${idea.side.toUpperCase()} REPLY`:`${idea.side.toUpperCase()}’S IDEA`} · ${esc(idea.san)}</span><p>${esc(idea.reason)}</p><p><strong>Possible plan:</strong> ${esc(idea.plan)}</p>${planVisual}${idea.watch?`<p class="opponent-idea-watch"><strong>Watch:</strong> ${esc(idea.watch)}</p>`:''}</div>`;
+  const opponentKey=`${current.id}|${index}|${move.lan}`;
+  return focus?`<details class="opponent-context" data-opponent-key="${esc(opponentKey)}" ${opponentExpandedKey===opponentKey?'open':''}><summary>${idea.side}’s last move · ${esc(idea.san)}</summary>${content}</details>`:content;
 }
-function paintOpponentIdea() { const slot=$('#opponent-idea-slot');if(slot)slot.innerHTML=opponentIdeaMarkup(); }
+function paintOpponentIdea() { const slot=$('#opponent-idea-slot');if(slot){const open=slot.querySelector('details')?.open;slot.innerHTML=opponentIdeaMarkup();if(open&&slot.querySelector('details'))slot.querySelector('details').open=true;} }
 function evaluationState() {
   const shown=shownGame(),state=positionAnalysis.state?.fen===shown.fen()?positionAnalysis.state:null;
   return {shown,state,model:positionEvaluation(shown,state?.analysis)};
@@ -229,7 +231,7 @@ function moveExplanationMarkup(attempt) {
   const translation=`<p class="move-in-words">${esc(moveWords(attempt.before,attempt.uci))}</p>`;
   if(!comparison)return translation+attempt.explanation.facts.map(t=>`<p>${esc(t)}</p>`).join('');
   const c=comparison;
-  return (c.bestSAN===c.playedSAN?'':translation)+`${attempt.grade.severity>0&&c.bestSAN!==c.playedSAN&&c.cause?`<p>${esc(c.cause)}</p>`:''}<div class="best-move-lesson"><div class="best-move-copy"><button class="best-move-preview-trigger" data-best-ply="${attempt.ply}" data-best-uci="${attempt.uci}" aria-label="Preview ${esc(c.bestSAN)} and the opponent’s reply" ${busy||coachHelp?.stage==='loading'?'disabled':''}>${c.bestSAN===c.playedSAN?'Best move':'Best was'} <strong>${esc(c.bestSAN)}</strong><span aria-hidden="true"> ↗</span></button><small class="move-translation">${esc(moveWords(attempt.before,attempt.lines[0].pv[0]))}</small><p>${esc(c.bestIdea)}</p></div>${miniLineMarkup(attempt.before,attempt.lines[0].pv,flipped)}</div>${c.reply?`<p class="coach-reply-summary"><strong>Watch for:</strong> ${esc(c.reply)}</p>`:''}`;
+  return (c.bestSAN===c.playedSAN?'':translation)+`${attempt.grade.severity>0&&c.bestSAN!==c.playedSAN?`<section class="move-consequence"><strong>${attempt.grade.severity>=3?'Why this is a blunder':attempt.grade.severity>=2?'Why this is a mistake':'Why this is inaccurate'}</strong><p>${esc(c.cause)}</p>${attempt.actual.pv.length>1?`<div class="consequence-replay"><div><small>After your ${esc(c.playedSAN)}</small><span>See the opponent’s response</span></div>${miniLineMarkup(new Chess(attempt.before).move(uciMove(attempt.uci)).after,attempt.actual.pv.slice(1),flipped)}</div>`:''}</section>`:''}<div class="best-move-lesson"><div class="best-move-copy"><button class="best-move-preview-trigger" data-best-ply="${attempt.ply}" data-best-uci="${attempt.uci}" aria-label="Preview ${esc(c.bestSAN)} and the opponent’s reply" ${busy||coachHelp?.stage==='loading'?'disabled':''}>${c.bestSAN===c.playedSAN?'Best move':'Best was'} <strong>${esc(c.bestSAN)}</strong><span aria-hidden="true"> ↗</span></button><small class="move-translation">${esc(moveWords(attempt.before,attempt.lines[0].pv[0]))}</small><p>${esc(c.bestIdea)}</p></div>${miniLineMarkup(attempt.before,attempt.lines[0].pv,flipped)}</div>${c.reply?`<p class="coach-reply-summary"><strong>Watch for:</strong> ${esc(c.reply)}</p>`:''}`;
 
 }
 function closeGradePopover(restoreFocus=false) {
@@ -943,7 +945,7 @@ document.addEventListener('change',e=>{
     mobileCoachView='coach';persist();render();
   }
 });
-document.addEventListener('toggle',e=>{if(e.target.matches('[data-next-options]'))nextExpandedFen=e.target.open?e.target.dataset.position:null;if(e.target.matches('[data-previous-options]'))previousExpandedKey=e.target.open?e.target.dataset.attempt:null;},true);
+document.addEventListener('toggle',e=>{if(e.target.matches('[data-next-options]'))nextExpandedFen=e.target.open?e.target.dataset.position:null;if(e.target.matches('[data-previous-options]'))previousExpandedKey=e.target.open?e.target.dataset.attempt:null;if(e.target.matches('[data-opponent-key]'))opponentExpandedKey=e.target.open?e.target.dataset.opponentKey:null;},true);
 document.addEventListener('pointerdown',e=>{gradeTriggerWasOpen=!!e.target.closest('#piece-move-grade,#mobile-move-grade') && $('#piece-grade-popover').matches(':popover-open');},true);
 $('#piece-grade-popover').addEventListener('toggle',e=>{if(e.newState==='closed'){mobileGradeOpen=false;for(const b of document.querySelectorAll('[aria-controls="piece-grade-popover"]'))b.setAttribute('aria-expanded','false');}});
 window.addEventListener('scroll',()=>closeGradePopover(),{passive:true});
