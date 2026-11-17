@@ -1,6 +1,4 @@
 /* Visible guidance without changing the board's dimensions. */
-.first-game-coachmark{background:#214d40!important;color:#fff!important;border:2px solid #d3b16d!important;box-shadow:0 7px 22px #163b3840!important}
-.first-game-coachmark:before{background:#214d40!important;border-color:#d3b16d!important}.first-game-coachmark span{color:#f1e9d3!important}
 #mobile-best-move{display:inline-flex;align-items:center;justify-content:center;gap:5px;width:auto;padding:4px 9px}
 .coach-icon-label{font-size:12px;font-weight:650;white-space:nowrap}
 .mini-board[data-mini-enlarge]{display:block;width:100%;padding:0;border:0;border-radius:7px;cursor:zoom-in;background:transparent;min-height:0;overflow:hidden}
@@ -21,8 +19,6 @@
 .game-result-board strong{background:#214d40;color:#fffefa;border:2px solid #c6a16b;border-radius:12px;padding:12px 28px;font-size:clamp(24px,4vw,40px)}
 .game-result-board span{background:#fffefa;color:#253b33;padding:8px 14px;border-radius:8px;font-weight:650;font-size:14px;text-align:center}
 @media(max-width:900px){#mobile-best-move{gap:2px;padding:4px}.coach-icon-label{font-size:10px}#replay-body .mini-line-preview{width:min(100%,calc(100dvh - 310px))}.game-result-board{gap:8px}}
-.section-coachmark{display:flex;align-items:center;justify-content:space-between;gap:8px;border-left:3px solid #c6a16b;background:#f7eedb;color:#485338;padding:7px 10px;margin:8px 0;border-radius:6px;font-size:12px;line-height:1.5}
-.section-coachmark b{color:#315740;margin-right:4px}.section-coachmark button{border:0;background:transparent;color:#5c6758;min-width:32px;min-height:32px;font-size:20px;padding:2px;cursor:pointer}
 #mobile-best-move{flex:0 0 auto}
 @media(max-width:360px){.timeline .timeline-buttons .icon-button{width:24px;min-width:24px;padding-inline:1px}.timeline .coaching-switch select{width:74px}#resume-play{width:28px;min-width:28px;flex-basis:28px}.coach-icon-label{font-size:9px}}
 @media(max-width:360px){#mobile-best-move{font-size:18px;padding-inline:2px;gap:1px}.timeline{gap:1px}}
