@@ -15,6 +15,8 @@ import { resetPractice } from './reset-practice.js';
 import { bestMovePreview } from './best-move-preview.js';
 import { miniLineMarkup } from './mini-line.js';
 import { shortMoveIdea } from './move-idea.js';
+import { reviewModel } from './game-review.js';
+import './game-review.css';
 import { compareMove } from './move-comparison.js';
 import './whatif.css';
 import './mobile-coach.css';
@@ -315,6 +317,8 @@ function chooseQuickAlternative(delta) {
   arrow=null;selected=null;render();
 }
 function paintMobilePreview() {
+  if(current?.finished&&!preview?.line&&!positionEditor){const card=$('#mobile-preview-coach');card.hidden=false;card.classList.add('review-mobile-lesson');card.classList.remove('best-alternative-card');$('.play-area').classList.remove('coach-preview-active');card.innerHTML=reviewLessonMarkup(reviewModel(current),true);return;}
+  $('#mobile-preview-coach').classList.remove('review-mobile-lesson');
   const suggestion=preview?.bestAlternative?preview.suggestion:preview?.coach?coachHelp?.suggestion:preview?.line?{fen:preview.base,pv:preview.line,line:sanLine(preview.base,preview.line,preview.line.length),hint:'Step forward to explore the suggested move and the opponent’s reply.'}:null;
   const lesson=suggestion?previewLesson(suggestion,preview.step,playerLevel()):null;
   const card=$('#mobile-preview-coach');card.hidden=!lesson;
@@ -432,6 +436,7 @@ function render() {
   if (!state) return;
   stopMiniReplay();
   const active = current && !current.finished;
+  $('.workspace').classList.toggle('review-mode',!!current?.finished);
   $('#coaching-intensity').value=intensity;
   $('#coaching-intensity').title=COACHING_MODES.find(m=>m.id===intensity).description;
   document.querySelector('[data-show-five]').hidden=true;
@@ -511,7 +516,7 @@ function previousMoveOptionsMarkup(attempt) {
   }).join('')}</div>${alternatives.length?'<small class="next-moves-note">Replay an alternative and a possible reply. Your game stays unchanged.</small>':'<p class="next-moves-status">No other analysed moves are available for this turn.</p>'}</details>`;
 }
 function renderCoach(active) {
-  if(current?.finished&&!preview){renderMoves();return;}
+  if(current?.finished&&!preview?.line&&!positionEditor){renderGameReview();return;}
   if(current?.finished || preview?.bestAlternative){renderLegacyCoach(active);return;}
   if(preview?.coach){$('#panel-content').innerHTML=coachHelpMarkup();return;}
   let html='<div class="coach-toolbar"><h2>Your coach</h2></div>';
@@ -562,19 +567,60 @@ function renderLegacyCoach(active) {
   if (current?.finished) html+=`<div class="review-banner"><strong>${esc(current.result || 'Practice saved')}</strong><p>Select a move in the Moves tab to revisit its position and coaching.</p><button class="button secondary" id="review-moves">Explore game moves →</button></div>`;
   $('#panel-content').innerHTML=html+'</div>';
 }
+let reviewAnalysisTask=null,reviewAnalysisError=null,reviewAnalysisGameId=null;
+function selectedReviewPly(){return (preview?.historyPly??current?.moves.length??0)-1;}
+function ensureGameReview(){
+  if(reviewAnalysisGameId!==current?.id){reviewAnalysisGameId=current?.id;reviewAnalysisError=null;}
+  if(!current?.finished||!engineReady||reviewAnalysisTask||reviewAnalysisError)return;
+  const model=reviewModel(current),missing=model.history.map((move,ply)=>({move,ply})).filter(({ply})=>!model.entries.has(ply));
+  if(!missing.length)return;
+  const record=current,token=generation,request={id:record.id};reviewAnalysisTask=request;
+  queueMicrotask(async()=>{
+    try{
+      for(const {move,ply} of missing){
+        if(current!==record||!record.finished||generation!==token)break;
+        const search=await engine.search(move.before,{count:Math.min(3,new Chess(move.before).moves().length),ms:500});
+        const best=search.lines[0];if(!best)throw Error('No analysis returned');
+        let actual=search.lines.find(line=>line.pv[0]===move.lan);
+        if(!actual)actual=(await engine.search(move.before,{count:1,ms:400,only:move.lan})).lines[0];
+        if(!actual||actual.pv[0]!==move.lan)throw Error('No legal move analysis returned');
+        if(current!==record||!record.finished||generation!==token)break;
+        const grade=gradeMove(best,actual,best.pv[0]===move.lan);
+        const attempt={ply,before:move.before,after:move.after,uci:move.lan,san:move.san,lines:search.lines,actual,grade,depth:search.depth,explanation:explainMove(move.before,move,best,actual,grade,playerLevel())};
+        record.reviewAttempts||=[];record.reviewAttempts.push(attempt);await persist();render();
+      }
+    }catch{if(current===record)reviewAnalysisError='Some moves could not be analysed. You can still review the game.';}
+    finally{if(reviewAnalysisTask===request)reviewAnalysisTask=null;if(current?.finished)render();}
+  });
+}
+function jumpReviewKey(direction){
+  const model=reviewModel(current),selected=selectedReviewPly(),choices=direction>0?model.keyPlies:model.keyPlies.toReversed();
+  const ply=choices.find(p=>direction>0?p>selected:p<selected);if(ply!=null)navigateHistory(ply+1);
+}
+function reviewLessonMarkup(model,compact=false){
+  const ply=selectedReviewPly(),move=model.history[ply],entry=model.entries.get(ply);
+  if(!move)return '<div class="review-lesson"><strong>Starting position</strong><p>Use the arrows or choose a move to begin.</p></div>';
+  const badge=entry?moveBadge(entry.grade):null,number=Number(move.before.split(' ')[5]);
+  const heading=`<div class="review-lesson-heading"><strong>${number}${move.color==='w'?'.':'…'} ${esc(move.san)}</strong><span class="${badge?'grade-'+badge.tone:'review-unrated'}">${badge?esc(badge.symbol+' '+badge.label):'Analysing…'}</span></div>`;
+  if(compact){const c=entry?compareMove(entry,playerLevel()):null;return `<section class="review-lesson">${heading}<p>${esc(entry?.grade.severity>0&&c?.cause?c.cause:shortMoveIdea(move.before,{pv:[move.lan]}))}</p>${c&&c.bestSAN!==move.san?`<button class="best-move-preview-trigger" data-best-ply="${ply}" data-best-uci="${move.lan}">Better: <strong>${esc(c.bestSAN)}</strong> ↗</button>`:''}<div class="review-step-controls"><button class="icon-button" data-review-step="-1" aria-label="Previous review move" ${ply<0?'disabled':''}>←</button><span>${ply+1} / ${model.total}</span><button class="icon-button" data-review-step="1" aria-label="Next review move" ${ply>=model.total-1?'disabled':''}>→</button></div></section>`;}
+  return `<section class="review-lesson">${heading}${entry?moveExplanationMarkup(entry):`<p>${esc(moveInWords(move))}</p><p>${esc(shortMoveIdea(move.before,{pv:[move.lan]}))}</p>`}${entry?.grade.severity>0&&(isFreePlay()||move.color===current.color)?`<button class="button secondary" data-review-retry="${ply}">↶ Try a better move</button>`:''}</section>`;
+}
+function reviewGraphMarkup(model){
+  const n=model.points.length,x=i=>n<=1?50:i/(n-1)*100,y=p=>50-44*Math.tanh(p/4);let segments=[],part=[];
+  model.points.forEach((p,i)=>{if(p==null){if(part.length)segments.push(part);part=[];}else part.push(`${x(i)},${y(p)}`);});if(part.length)segments.push(part);
+  const selected=selectedReviewPly();
+  return `<div class="review-graph" data-review-chart role="group" tabindex="0" aria-label="Game advantage graph. Click a point or use arrow keys to review moves."><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 50H100" class="review-graph-zero"/>${segments.map(p=>`<polyline points="${p.join(' ')}"/>`).join('')}${model.points.map((p,i)=>p==null?'':`<circle cx="${x(i)}" cy="${y(p)}" r="${i===selected?2:1}" class="${model.entries.get(i)?.grade.severity>=2?'graph-mistake':''}"/>`).join('')}${selected>=0?`<path d="M${x(selected)} 0V100" class="review-graph-selected"/>`:''}</svg><span class="review-graph-white">White</span><span class="review-graph-black">Black</span></div>`;
+}
+function renderGameReview(){
+  if(!current)return;ensureGameReview();
+  const model=reviewModel(current),selected=selectedReviewPly(),previous=model.keyPlies.some(p=>p<selected),next=model.keyPlies.some(p=>p>selected);
+  let html=`<header class="game-review-heading"><span class="eyebrow">POST-GAME</span><h2>Game review</h2><p>${esc(current.result||'Game complete')}</p><button class="button secondary review-start" data-review-move="${model.keyPlies[0]??0}" ${model.total?'':'disabled'}>Start review →</button></header><div class="review-side-summaries">${['w','b'].map(color=>{const s=model.sides[color];return `<div><strong>${color==='w'?'♙ White':'♟ Black'}</strong><span>${s.analysed?`<b>${s.best+s.good}</b> / ${s.analysed}`:'<b>—</b>'}</span><small>strong moves · ${s.analysed}/${s.total} analysed</small></div>`;}).join('')}</div>${reviewGraphMarkup(model)}<div class="review-analysis-status" role="status">${reviewAnalysisError?`${esc(reviewAnalysisError)} <button data-review-analyse>Retry analysis</button>`:model.analysed<model.total?`Analysing both sides · ${model.analysed} / ${model.total} moves`:'All moves analysed on this device'}</div><details class="review-breakdown" ${sectionAttributes('review-breakdown')}><summary>Move breakdown</summary><div class="review-breakdown-grid"><span></span><strong>White</strong><strong>Black</strong>${[['best','Best'],['good','Good / OK'],['inaccuracy','Inaccuracies'],['mistake','Mistakes'],['blunder','Blunders']].map(([key,label])=>`<span>${label}</span><b>${model.sides.w[key]}</b><b>${model.sides.b[key]}</b>`).join('')}</div></details><div class="review-key-navigation"><button class="button secondary" data-review-key="-1" ${previous?'':'disabled'}>← Previous key move</button><button class="button secondary" data-review-key="1" ${next?'':'disabled'}>Next key move →</button></div><div class="desktop-review-lesson">${reviewLessonMarkup(model)}</div><div class="review-move-heading"><strong>Moves</strong><small>Tap a move to review</small></div><div class="review-score-sheet"><div class="review-score-head"><span></span><strong>White</strong><strong>Black</strong></div>${model.rows.map(row=>`<div class="review-score-row"><span>${row.number}.</span>${[row.w,row.b].map(ply=>{if(ply==null)return '<span></span>';const m=model.history[ply],a=model.entries.get(ply),badge=a?moveBadge(a.grade):null;return `<button data-review-move="${ply}" class="${selected===ply?'is-selected':''} ${badge?'grade-'+badge.tone:''}" ${selected===ply?'aria-current="step"':''} aria-label="${m.color==='w'?'White':'Black'} ${esc(m.san)}${badge?', '+esc(badge.label):', not yet analysed'}"><strong>${esc(m.san)}</strong><span>${badge?esc(badge.symbol):'·'}</span></button>`;}).join('')}</div>`).join('')}</div>`;
+  $('#panel-content').innerHTML=html;
+}
 function renderMoves() {
   if (!current) { $('#panel-content').innerHTML='<div class="coach-empty"><h3>Your story starts on move one.</h3><p>Start a practice to build your move history.</p></div>'; return; }
   const history=historyGame().history({verbose:true});
-  if(current.finished){
-    let review='<div class="review-story-heading"><h2>Every move has a story.</h2><p>Replay a moment. Learn its idea.</p></div><div class="review-story-cards">';
-    review+=history.map((move,i)=>{
-      const attempt=[...(current.attempts||[])].reverse().find(a=>a.ply===i&&a.uci===move.lan);
-      const badge=attempt?moveBadge(attempt.grade):null;
-      const pv=[move.lan,...(history[i+1]?[history[i+1].lan]:[])];
-      return `<article class="next-move-option review-story-card"><div class="next-option-text"><button class="review-story-move" data-history="${i}" aria-label="Review ${move.color==='w'?'White':'Black'} ${move.san}"><strong>${Math.floor(i/2)+1}${move.color==='w'?'.':'…'} ${esc(move.san)}</strong>${badge?`<span class="review-story-grade grade-${badge.tone}">${esc(badge.symbol)} ${esc(badge.label)}</span>`:''}</button><p class="next-idea">${esc(shortMoveIdea(move.before,{pv}))}</p><small class="review-story-words">${esc(moveInWords(move))}</small></div>${miniLineMarkup(move.before,pv,flipped)}</article>`;
-    }).join('');
-    $('#panel-content').innerHTML=review+'</div>';return;
-  }
+  if(current.finished){renderGameReview();return;}
   let html=`<div class="panel-intro"><h2>Your moves</h2><p>Tap a move to revisit it.</p></div><div class="move-table"><div class="move-table-head"><span>#</span><span>WHITE</span><span>BLACK</span></div>`;
   for(const row of historyRows(current)) html+=`<div class="move-row"><span>${row.number}</span>${[row.w,row.b].map(j=>{const m=j==null?null:history[j]; if(!m)return '<span></span>'; const a=coaching().grades?[...(current.attempts||[])].reverse().find(a=>a.ply===j && a.uci===m.lan):null; const manual=current.overrides?.some(o=>o.ply===j&&o.uci===m.lan); return `<div class="move-cell"><button data-history="${j}" class="${a?.grade.severity>=2?'bad-move':''}">${esc(m.san)} <span class="move-list-translation">${esc(moveInWords(m))}</span><small>${manual?'↳':a?.grade.severity>=2?'?':a?.grade.label==='Best move'?'✓':''}</small></button></div>`;}).join('')}</div>`;
   html+='</div>';
@@ -710,7 +756,7 @@ function bestPreviewMarkup() {
 }
 function previewBestMove(ply,uci) {
   if(busy || !current || preview?.bestAlternative || coachHelp?.stage==='loading')return;
-  const attempt=[...current.attempts].reverse().find(a=>a.ply===ply&&a.uci===uci);
+  const attempt=current.finished?reviewModel(current).entries.get(ply):[...current.attempts].reverse().find(a=>a.ply===ply&&a.uci===uci);
   const result=bestMovePreview(current,attempt,playerLevel());
   if(!result){toast('No saved best-move line is available for this decision.');return;}
   const returnState={preview,coachHelp,focus,tab,mobileCoachView,mobilePreviewExpanded,arrow};
@@ -942,6 +988,7 @@ function replayMini(button){
   miniReplayTimer=setInterval(()=>{if(!mini.isConnected){stopMiniReplay();return;}index++;if(index>=frames.length){stopMiniReplay();return;}paint();},1100);
 }
 document.addEventListener('click',e=>{
+  const chart=e.target.closest('[data-review-chart]');if(chart&&current?.finished){const r=chart.getBoundingClientRect(),i=Math.round(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*(current.moves.length-1));navigateHistory(i+1);return;}
   const b=e.target.closest('button');if(!b || b.disabled)return;
   if(positionEditor && !b.dataset.editorTurn && !['resume-play','editor-undo','editor-cancel','flip','reset-board'].includes(b.id)){toast('Resume or cancel your position edits first.');return;}
   if(b.dataset.editorTurn&&positionEditor){positionEditor.turn=b.dataset.editorTurn;$('#position-editor-error').hidden=true;drawBoard();return;}
@@ -963,6 +1010,11 @@ document.addEventListener('click',e=>{
   if(b.dataset.tab){tab=b.dataset.tab;mobileDestination=tab;render();return;} if(b.dataset.panel){tab=b.dataset.panel;if(tab==='coach')mobileCoachView='coach';mobileDestination=tab;render();return;}
   if(b.hasAttribute('data-next-retry')){nextMoves=null;render();return;}
   if(b.dataset.candidate!=null){showCandidate(Number(b.dataset.candidate));return;}
+  if(b.dataset.reviewMove!=null){navigateHistory(Number(b.dataset.reviewMove)+1);return;}
+  if(b.dataset.reviewKey){jumpReviewKey(Number(b.dataset.reviewKey));return;}
+  if(b.dataset.reviewStep){stepHistory(Number(b.dataset.reviewStep));return;}
+  if(b.dataset.reviewRetry!=null){const a=reviewModel(current).entries.get(Number(b.dataset.reviewRetry));if(a){focus=a;retryMove();}return;}
+  if(b.hasAttribute('data-review-analyse')){reviewAnalysisTask=null;reviewAnalysisError=null;render();return;}
   if(b.dataset.history!=null){viewHistory(Number(b.dataset.history));return;} if(b.dataset.game){$('#info').close();openRecord(b.dataset.game);return;}
   const actions={ 'dismiss-playback-hint':dismissPlaybackHint,'resume-play':resumePlay,'editor-undo':undoPositionEdit,'editor-cancel':cancelPositionEditor,'piece-grade-close':()=>closeGradePopover(true),'piece-grade-retry':()=>{closeGradePopover();retryMove();},'piece-move-grade':toggleGradeExplanation,'mobile-move-grade':toggleGradeExplanation,'badge-help':toggleGradeExplanation,'desktop-grade-retry':retryMove,'mobile-grade-retry':retryMove,'mobile-best-move':showBestDirection,'quick-choice-back':()=>chooseQuickAlternative(-1),'quick-choice-next':()=>chooseQuickAlternative(1),'quick-close':()=>{coachHelp=null;arrow=null;render();},'quick-choice-preview':()=>previewCoachMove(1),'quick-choice-play':playCoachMove,'mobile-preview-back':()=>stepPreview(-1),'mobile-preview-next':()=>stepPreview(1),'mobile-preview-return':returnToGame,'mobile-preview-details':togglePreviewExplanation,'ask-coach':askCoach,'coach-show-move':()=>revealCoachMove(),'coach-preview-move':()=>previewCoachMove(1),'coach-preview-reply':()=>previewCoachMove(2),'coach-play-move':playCoachMove,'coach-dismiss':dismissCoachHelp,'coach-retry-help':()=>{coachHelp=null;askCoach();},'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
     'exit-preview':returnToGame,'cancel-opponent-edit':returnToGame,'explain-evaluation':explainEvaluation,'retry-evaluation':()=>{$('#info').close();positionAnalysis.retry(shownGame().fen());},'line-back':()=>stepPreview(-1),'line-next':()=>stepPreview(1),'history-start':()=>navigateHistory(0),'history-back':()=>stepHistory(-1),'history-next':()=>stepHistory(1),'history-live':returnToGame,'show-punishment':showPlayedLine,
