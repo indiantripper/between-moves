@@ -1,3 +1,4 @@
+import { decisionReplay } from './decision-replay.js';
 import { Chess } from 'chess.js';
 import { uciMove,PIECE_NAMES,explainCandidate,displayScore } from './coach.js';
 import { coachSuggestion } from './ask-coach.js';
@@ -16,10 +17,11 @@ export function compareMove(attempt,level=1350) {
     played=actualMoves[0];bestMove=bestMoves[0];if(!played||!bestMove)return null;
   }catch{return null;}
   const after=new Chess(played.after),bestAfter=new Chess(bestMove.after),reply=actualMoves[1],bad=attempt.grade?.severity>0;
+  const missedMate=decisionReplay(attempt)?.mode==='missed-mate';
   let cause='',cost='';
   if(!bad)cause=explainCandidate(attempt.before,actual,level);
+  else if(missedMate)cause=`${bestMove.san} starts a forced mate in ${best.mate}${best.mate===1?' move':' moves'}. ${played.san} misses that finish.`;
   else if(actual.mate<0 && !(best.mate<0))cause=reply?.san.endsWith('#')?`${played.san} allows ${reply.san}: your king has no legal escape. ${bestMove.san} avoids that immediate mate.`:`${played.san} allows a mating attack${reply?` starting with ${reply.san}`:''}. The engine finds mate against you in ${Math.abs(actual.mate)} moves; ${bestMove.san} avoids that line.`;
-  else if(best.mate>0 && !(actual.mate>0))cause=`There is a mating continuation starting with ${bestMove.san}; ${played.san} misses that finish in the engine’s search.`;
   else if(reply?.captured && reply.to===played.to)cause=`${played.san} puts your ${PIECE_NAMES[played.piece]} on ${played.to}, where ${reply.san} can capture it. Compare the continuation to see whether you recover material.`;
   else if(reply?.captured && before.attackers(reply.to,played.color).includes(played.from) && !after.attackers(reply.to,played.color).length)cause=`Moving your ${PIECE_NAMES[played.piece]} from ${played.from} removes its defence of ${reply.to}. ${reply.san} can then capture your ${PIECE_NAMES[reply.captured]} there.`;
   else if(reply?.captured && !after.attackers(reply.to,played.color).length && bestAfter.get(reply.to)?.color===played.color && bestAfter.attackers(reply.to,played.color).includes(bestMove.to))cause=`${played.san} leaves your ${PIECE_NAMES[reply.captured]} on ${reply.to} without a defender; ${reply.san} can capture it. ${bestMove.san} adds a defender to that piece.`;
@@ -45,5 +47,5 @@ export function compareMove(attempt,level=1350) {
   }else if(actual.mate<0)cost=`The engine reports a forced mate against you in ${Math.abs(actual.mate)} moves in this line.`;
   else if(best.mate>0)cost=`The engine reports a mate in ${best.mate} starting with ${bestMove.san}.`;
   const replyIdea=reply?explainOpponentMove({before:played.after,uci:reply.lan,previousMove:played,level}):null;
-  return {cause,cost,uncertain,reply:replyIdea?`${reply.san}: ${replyIdea.reason}`:'',bestSAN:bestMove.san,bestIdea:coachSuggestion(attempt.before,best,level)?.idea||explainCandidate(attempt.before,best,level),playedSAN:played.san,playedLine:actualMoves.map(m=>m.san),bestLine:bestMoves.map(m=>m.san),playedScore:displayScore(actual,before.turn()),bestScore:displayScore(best,before.turn()),depth:attempt.depth||best.depth||0};
+  return {cause,cost,uncertain,missedMate,reply:replyIdea?`${reply.san}: ${replyIdea.reason}`:'',bestSAN:bestMove.san,bestIdea:coachSuggestion(attempt.before,best,level)?.idea||explainCandidate(attempt.before,best,level),playedSAN:played.san,playedLine:actualMoves.map(m=>m.san),bestLine:bestMoves.map(m=>m.san),playedScore:displayScore(actual,before.turn()),bestScore:displayScore(best,before.turn()),depth:attempt.depth||best.depth||0};
 }

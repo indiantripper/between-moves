@@ -6,18 +6,18 @@ import {pinBehind} from './opponent-coach.js';
 const value={p:1,n:3,b:3,r:5,q:9,k:0};
 const side=c=>c==='w'?'White':'Black';
 const material=(board,color)=>board.board().flat().filter(Boolean).reduce((n,p)=>n+(p.color===color?1:-1)*value[p.type],0);
-export function replayLesson(fen,pv,step,{punishment=false}={}){
+export function replayLesson(fen,pv,step,{punishment=false,mode='line'}={}){
  try{
   const root=new Chess(fen),board=new Chess(fen),count=Math.max(0,Math.min(pv.length,step));let move,previous,before;
   for(const uci of pv.slice(0,count)){before=board.fen();previous=move;move=board.move(uciMove(uci));}
-  const attacker=root.turn(),defender=attacker==='w'?'b':'w',marks=[],lines=[];
-  if(!move)return {heading:punishment?'After your mistake':'Starting position',words:'Before this continuation.',reason:punishment?'Look for the opponent’s checks, captures and attacks. Step forward to see one possible punishment.':'Step forward to see the move and its idea.',watch:'',impact:'',marks,lines};
-  const actor=punishment?(move.color===attacker?'Opponent':'Your defence'):side(move.color);
+  const mating=mode==='missed-mate',attacker=root.turn(),defender=attacker==='w'?'b':'w',marks=[],lines=[];
+  if(!move)return {heading:mating?'Before your move':punishment?'After your mistake':'Starting position',words:'Before this continuation.',reason:mating?'You had a mating chance here. Step forward to see the winning move.':punishment?'Look for the opponent’s checks, captures and attacks. Step forward to see one possible punishment.':'Step forward to see the move and its idea.',watch:'',impact:'',marks,lines};
+  const actor=mating?(move.color===attacker?'Your mating move':'Opponent’s defence'):punishment?(move.color===attacker?'Opponent':'Your defence'):side(move.color);
   const mark=(square,role,label)=>marks.push({square,role,label});
   mark(move.from,'move','Move starts here');mark(move.to,'move','Piece moved here');
   if(move.flags.includes('k')||move.flags.includes('q')){const rank=move.to[1],kingSide=move.flags.includes('k');mark((kingSide?'h':'a')+rank,'move','Castling rook starts here');mark((kingSide?'f':'d')+rank,'move','Castling rook moves here');}
   let reason='',watch='';
-  if(board.isCheckmate())reason=`${side(move.color)} gives checkmate. The king is attacked and has no legal escape.`;
+  if(board.isCheckmate())reason=`${side(move.color)} gives checkmate. The king is attacked and has no legal escape.${mating?' This is the finish you missed.':''}`;
   else if(move.captured){
    const recapture=previous?.captured&&previous.to===move.to;
    reason=`${side(move.color)} ${recapture?'takes back':'captures'} the ${PIECE_NAMES[move.captured]} on ${move.to}.`;
