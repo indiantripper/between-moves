@@ -1,26 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nextGuideStep} from '../src/guided-tour.js';
-test('onboarding follows available events and offers one step at a time',()=>{
- assert.equal(nextGuideStep({hasGame:false,hasGames:false}).id,'start');
- const playing={hasGame:true,hasGames:true};assert.equal(nextGuideStep(playing,{start:true}).id,'best');
- const seen={start:true,best:true};assert.equal(nextGuideStep(playing,seen),null);
- const afterMove={...playing,feedback:true,alternatives:true};assert.equal(nextGuideStep(afterMove,seen).id,'feedback');seen.feedback=true;assert.equal(nextGuideStep(afterMove,seen).id,'alternatives');
- seen.alternatives=true;assert.equal(nextGuideStep(afterMove,seen),null);
- const reply={...afterMove,opponent:true,next:true};assert.equal(nextGuideStep(reply,seen).id,'opponent');seen.opponent=true;assert.equal(nextGuideStep(reply,seen).id,'next');seen.next=true;
- assert.equal(nextGuideStep({...reply,bad:false},seen),null);assert.equal(nextGuideStep({...reply,bad:true},seen).id,'punishment');
+import {nextGuideStep,guideDecisionCount} from '../src/guided-tour.js';
+const context=overrides=>({hasGame:true,hasGames:true,ready:true,decisions:1,idleMs:3000,now:100000,...overrides});
+test('the welcome waits for three seconds and user activity delays it',()=>{
+ const c={hasGame:false,hasGames:false,pageAgeMs:2999,idleMs:3000};assert.equal(nextGuideStep(c),null);assert.equal(nextGuideStep({...c,pageAgeMs:3000}).id,'start');assert.equal(nextGuideStep({...c,pageAgeMs:5000,idleMs:500}),null);
 });
-test('seen and skipped tour preferences persist without suppressing a later mistake tip',()=>{
- const seen=JSON.parse(JSON.stringify({start:true,best:true,feedback:true,alternatives:true,opponent:true,next:true}));
- assert.equal(nextGuideStep({hasGame:true,bad:true},seen).id,'punishment');
- assert.equal(nextGuideStep({hasGame:true,bad:true},{...seen,skipped:true}),null);
+test('introduce the badge first, the best move around the fifth decision and choices around the tenth',()=>{
+ assert.equal(nextGuideStep(context({badge:true})).id,'badge');
+ const seen={badge:true};assert.equal(nextGuideStep(context({decisions:3}),seen),null);assert.equal(nextGuideStep(context({decisions:4}),seen).id,'best');
+ assert.equal(nextGuideStep(context({decisions:8,next:true}),{...seen,best:true}),null);assert.equal(nextGuideStep(context({decisions:9,next:true}),{...seen,best:true}).id,'next');
 });
-test('the best move prompt waits until the icon can be used',()=>{
- assert.equal(nextGuideStep({hasGame:true,ready:false}),null);assert.equal(nextGuideStep({hasGame:true,ready:true}).id,'best');
+test('trying or dismissing a tip cannot immediately bring up another',()=>{
+ const seen={badge:true,_lastDecision:1,_lastAt:90000};assert.equal(nextGuideStep(context({decisions:4}),seen),null);assert.equal(nextGuideStep(context({decisions:4,now:120000}),seen).id,'best');assert.equal(nextGuideStep(context({decisions:2,now:200000,bad:true}),seen),null);
 });
-test('the move badge is introduced only when it appears, before the feedback section',()=>{
- const seen={start:true,best:true};
- assert.equal(nextGuideStep({hasGame:true,badge:false},seen),null);
- assert.equal(nextGuideStep({hasGame:true,badge:true,feedback:true},seen).id,'badge');
- assert.equal(nextGuideStep({hasGame:true,badge:true,feedback:true},{...seen,badge:true}).id,'feedback');
+test('Not now leaves a feature learnable after five more decisions',()=>{
+ const seen={_snoozed:{badge:6}};assert.equal(nextGuideStep(context({badge:true,decisions:3}),seen),null);assert.equal(nextGuideStep(context({badge:true,decisions:6}),seen).id,'badge');
+});
+test('contextual hints distinguish punishment from a missed chance',()=>{
+ const seen={badge:true};assert.equal(nextGuideStep(context({decisions:2,bad:true}),seen).id,'punishment');const tip=nextGuideStep(context({decisions:2,opportunity:true}),seen);assert.match(tip.title,/missed/);assert.equal(tip.target,'.missed-opportunity-lesson');
+});
+test('tips respect natural learning, finished games, busy turns and explicit opt out',()=>{
+ assert.equal(nextGuideStep(context({decisions:4}),{badge:true,best:true}),null);assert.equal(nextGuideStep(context({decisions:5,ready:false,badge:true})),null);assert.equal(nextGuideStep(context({finished:true,badge:true})),null);assert.equal(nextGuideStep(context({badge:true}),{skipped:true}),null);
+});
+test('experience spans games and excludes retries',()=>{
+ assert.equal(guideDecisionCount([{attempts:[{retry:false},{retry:true}]},{attempts:[{},{}]}]),3);
 });

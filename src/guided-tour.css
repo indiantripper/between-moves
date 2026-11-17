@@ -10,3 +10,8 @@
 .replay-coach-lesson h3{font-size:14px;margin:0 0 5px}.replay-coach-lesson p{font-size:14px;line-height:1.5;margin:4px 0}.replay-watch{color:#9b4934}.replay-impact{font-weight:650;color:#315b43}.replay-highlight-key{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:#6d7868;margin:5px 0}.replay-highlight-key span:before{content:'●';margin-right:4px;color:#c59330}.replay-highlight-key span:nth-child(2):before{color:#bf5948}.replay-highlight-key span:nth-child(3):before{color:#8967a8}
 @media(max-width:900px){#replay-body .mini-line-preview{width:min(100%,max(190px,calc(100dvh - 440px)))}.guide-card{padding:13px 15px}.guide-card h3{font-size:16px}.guide-card p{font-size:12px}}
 body:has(#guide-card:not([hidden])) .playback-coachmark,body:has(#guide-card:not([hidden])) .badge-discovery{display:none!important}
+@keyframes guide-appear{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes guide-spotlight-appear{from{opacity:0}to{opacity:1}}
+.guide-enter{animation:guide-appear 200ms cubic-bezier(.2,.7,.2,1) both}
+.guide-spotlight-enter{animation:guide-spotlight-appear 200ms ease-out both}
+@media(prefers-reduced-motion:reduce){.guide-enter,.guide-spotlight-enter{animation:none}}

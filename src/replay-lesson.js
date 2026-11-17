@@ -10,9 +10,9 @@ export function replayLesson(fen,pv,step,{punishment=false,mode='line'}={}){
  try{
   const root=new Chess(fen),board=new Chess(fen),count=Math.max(0,Math.min(pv.length,step));let move,previous,before;
   for(const uci of pv.slice(0,count)){before=board.fen();previous=move;move=board.move(uciMove(uci));}
-  const mating=mode==='missed-mate',attacker=root.turn(),defender=attacker==='w'?'b':'w',marks=[],lines=[];
-  if(!move)return {heading:mating?'Before your move':punishment?'After your mistake':'Starting position',words:'Before this continuation.',reason:mating?'You had a mating chance here. Step forward to see the winning move.':punishment?'Look for the opponent’s checks, captures and attacks. Step forward to see one possible punishment.':'Step forward to see the move and its idea.',watch:'',impact:'',marks,lines};
-  const actor=mating?(move.color===attacker?'Your mating move':'Opponent’s defence'):punishment?(move.color===attacker?'Opponent':'Your defence'):side(move.color);
+  const mating=mode==='missed-mate',opportunity=mode==='missed-opportunity',winning=mating||opportunity,attacker=root.turn(),defender=attacker==='w'?'b':'w',marks=[],lines=[];
+  if(!move)return {heading:winning?'Before your move':punishment?'After your mistake':'Starting position',words:'Before this continuation.',reason:mating?'You had a mating chance here. Step forward to see the winning move.':opportunity?'Step forward to see the tactical chance you missed.':punishment?'Look for the opponent’s checks, captures and attacks. Step forward to see one possible punishment.':'Step forward to see the move and its idea.',watch:'',impact:'',marks,lines};
+  const actor=winning?(move.color===attacker?(mating?'Your mating move':'Your better move'):'Opponent’s defence'):punishment?(move.color===attacker?'Opponent':'Your defence'):side(move.color);
   const mark=(square,role,label)=>marks.push({square,role,label});
   mark(move.from,'move','Move starts here');mark(move.to,'move','Piece moved here');
   if(move.flags.includes('k')||move.flags.includes('q')){const rank=move.to[1],kingSide=move.flags.includes('k');mark((kingSide?'h':'a')+rank,'move','Castling rook starts here');mark((kingSide?'f':'d')+rank,'move','Castling rook moves here');}
@@ -32,7 +32,7 @@ export function replayLesson(fen,pv,step,{punishment=false,mode='line'}={}){
    const pinText=pin.behind==='king'?`The ${PIECE_NAMES[pin.piece.type]} on ${pin.piece.square} is pinned: moving it would expose the king on ${pin.behindSquare}.`:`The ${PIECE_NAMES[pin.piece.type]} on ${pin.piece.square} shields the queen on ${pin.behindSquare}. Moving it could lose the queen.`;
    reason=reason?reason+' '+pinText:pinText;
    mark(pin.piece.square,'pin','Pinned or shielded piece');mark(pin.behindSquare,'pin',pin.behind==='king'?'King behind the pin':'Queen behind the piece');lines.push({from:move.to,to:pin.behindSquare,role:'pin',label:pinText});
-  }else if(targets.length&&!board.isCheck()){
+  }else if(targets.length){
    const chosen=targets.slice(0,2),description=chosen.map(p=>`the ${PIECE_NAMES[p.type]} on ${p.square}`).join(' and ');
    const attack=`${side(move.color)} attacks ${description}${chosen.length>1?' at the same time':''}.`;
    reason=reason?reason+' '+attack:attack;
@@ -56,7 +56,7 @@ export function replayLesson(fen,pv,step,{punishment=false,mode='line'}={}){
    }
   }
   const gain=material(board,attacker)-material(root,attacker);
-  const impact=punishment&&gain>0?`${side(attacker)} is up ${gain} ${gain===1?'point':'points'} of material since the mistake.`:punishment&&move.color===defender&&!board.isGameOver()?'Your side is trying to limit the damage in this line.':'';
+  const impact=opportunity&&gain>0?`${side(attacker)} has gained ${gain} ${gain===1?'point':'points'} of material in this line.`:punishment&&gain>0?`${side(attacker)} is up ${gain} ${gain===1?'point':'points'} of material since the mistake.`:punishment&&move.color===defender&&!board.isGameOver()?'Your side is trying to limit the damage in this line.':'';
   return {heading:`${actor} · ${move.san}`,words:moveInWords(move),reason,watch,impact,marks,lines};
  }catch{return null;}
 }

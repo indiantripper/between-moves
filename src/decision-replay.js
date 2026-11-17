@@ -1,3 +1,4 @@
+import {missedOpportunity} from './opportunity.js';
 import {Chess} from 'chess.js';
 import {uciMove} from './coach.js';
 // A missed win is taught from the original position, not the opponent's reply.
@@ -10,6 +11,8 @@ export function decisionReplay(attempt){
    new Chess(attempt.before).move(uciMove(best.pv[0]));
    return {mode:'missed-mate',fen:attempt.before,pv:[...best.pv],punishment:false,limit:Math.min(40,Math.max(12,2*best.mate-1)),mateIn:best.mate};
   }
+  const opportunity=missedOpportunity(attempt);
+  if(opportunity)return {mode:'missed-opportunity',fen:attempt.before,pv:[...best.pv],punishment:false,limit:12,...opportunity};
   return actual.pv.length>1?{mode:'punishment',fen:played.after,pv:actual.pv.slice(1),punishment:true,limit:12}:null;
  }catch{return null;}
 }

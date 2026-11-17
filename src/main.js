@@ -17,7 +17,7 @@ import { miniLineFrames, miniLineMarkup } from './mini-line.js';
 import { navigationCursor } from './navigation-cursor.js';
 import { decisionReplay } from './decision-replay.js';
 import { replayLesson } from './replay-lesson.js';
-import { GUIDE_STEPS,nextGuideStep } from './guided-tour.js';
+import { nextGuideStep,guideDecisionCount } from './guided-tour.js';
 import { extendReplayLine } from './replay-line.js';
 import './replay-dialog.css';
 import './guided-tour.css';
@@ -261,9 +261,9 @@ function moveExplanationMarkup(attempt) {
   const comparison=compareMove(attempt,playerLevel());
   const translation=`<p class="move-in-words">${esc(moveWords(attempt.before,attempt.uci))}</p>`;
   if(!comparison)return translation+attempt.explanation.facts.map(t=>`<p>${esc(t)}</p>`).join('');
-  const c=comparison,mateReplay=decisionReplay(attempt),missedMate=mateReplay?.mode==='missed-mate';
-  const consequence=attempt.grade.severity>0&&c.bestSAN!==c.playedSAN?`<section class="move-consequence"><strong>${missedMate?'You missed a checkmate':attempt.grade.severity>=3?'Why this is a blunder':attempt.grade.severity>=2?'Why this is a mistake':'Why this is inaccurate'}</strong><p>${esc(c.cause)}</p>${!missedMate&&mateReplay?`<div class="consequence-replay"><div><small>After your ${esc(c.playedSAN)}</small><span>How the opponent can punish this</span></div>${miniLineMarkup(mateReplay.fen,mateReplay.pv,flipped,{limit:mateReplay.limit,punishment:true,arrows:true})}</div>`:''}</section>`:'';
-  return (c.bestSAN===c.playedSAN?'':translation)+consequence+`<div class="best-move-lesson ${missedMate?'missed-mate-lesson':''}"><div class="best-move-copy"><button class="best-move-preview-trigger" data-best-ply="${attempt.ply}" data-best-uci="${attempt.uci}" aria-label="${missedMate?'See the missed mate starting with '+esc(c.bestSAN):'Preview '+esc(c.bestSAN)+' and the opponent’s reply'}" ${busy||coachHelp?.stage==='loading'?'disabled':''}>${missedMate?'Mate started with':c.bestSAN===c.playedSAN?'Best move':'Best was'} <strong>${esc(c.bestSAN)}</strong><span aria-hidden="true"> ↗</span></button><small class="move-translation">${esc(moveWords(attempt.before,attempt.lines[0].pv[0]))}</small><p>${missedMate?`Follow ${esc(c.bestSAN)} and the best defence to see how you could have given checkmate.`:esc(c.bestIdea)}</p></div>${miniLineMarkup(attempt.before,attempt.lines[0].pv,flipped,missedMate?{limit:mateReplay.limit,mode:'missed-mate',arrows:true}:{})}</div>${!missedMate&&c.reply?`<p class="coach-reply-summary"><strong>Watch for:</strong> ${esc(c.reply)}</p>`:''}`;
+  const c=comparison,mateReplay=decisionReplay(attempt),missedMate=mateReplay?.mode==='missed-mate',missedChance=mateReplay?.mode==='missed-opportunity',missed=missedMate||missedChance;
+  const consequence=attempt.grade.severity>0&&c.bestSAN!==c.playedSAN?`<section class="move-consequence"><strong>${missedMate?'You missed a checkmate':missedChance?esc(mateReplay.title):attempt.grade.severity>=3?'Why this is a blunder':attempt.grade.severity>=2?'Why this is a mistake':'Why this is inaccurate'}</strong><p>${esc(c.cause)}</p>${!missed&&mateReplay?`<div class="consequence-replay"><div><small>After your ${esc(c.playedSAN)}</small><span>How the opponent can punish this</span></div>${miniLineMarkup(mateReplay.fen,mateReplay.pv,flipped,{limit:mateReplay.limit,punishment:true,arrows:true})}</div>`:''}</section>`:'';
+  return (c.bestSAN===c.playedSAN?'':translation)+consequence+`<div class="best-move-lesson ${missed?'missed-opportunity-lesson':''}"><div class="best-move-copy"><button class="best-move-preview-trigger" data-best-ply="${attempt.ply}" data-best-uci="${attempt.uci}" aria-label="${missedMate?'See the missed mate starting with '+esc(c.bestSAN):missedChance?'See the opportunity starting with '+esc(c.bestSAN):'Preview '+esc(c.bestSAN)+' and the opponent’s reply'}" ${busy||coachHelp?.stage==='loading'?'disabled':''}>${missedMate?'Mate started with':missedChance?'You could play':c.bestSAN===c.playedSAN?'Best move':'Best was'} <strong>${esc(c.bestSAN)}</strong><span aria-hidden="true"> ↗</span></button><small class="move-translation">${esc(moveWords(attempt.before,attempt.lines[0].pv[0]))}</small><p>${missedMate?`Follow ${esc(c.bestSAN)} and the best defence to see how you could have given checkmate.`:missedChance?'Follow this move and the best defence to see what you missed.':esc(c.bestIdea)}</p></div>${miniLineMarkup(attempt.before,attempt.lines[0].pv,flipped,missed?{limit:mateReplay.limit,mode:mateReplay.mode,arrows:true}:{})}</div>${!missed&&c.reply?`<p class="coach-reply-summary"><strong>Watch for:</strong> ${esc(c.reply)}</p>`:''}`;
 
 }
 function closeGradePopover(restoreFocus=false) {
@@ -574,7 +574,7 @@ function renderLegacyCoach(active) {
       const san=sanLine(f.before,line.pv,1)[0], mine=line.pv[0]===f.uci, opening=openingForMove(f.before,line.pv[0]);
       return `<button class="candidate ${mine?'your-move':''}" data-candidate="${i}" ${busy?'disabled':''}><span class="candidate-rank">${i+1}</span><span class="candidate-description"><span class="candidate-title"><strong>${esc(san)}</strong>${mine?'<span class="mine-label">YOUR MOVE</span>':''}</span><small class="move-translation">${esc(moveWords(f.before,line.pv[0]))}</small>${opening?`<small>${esc(opening.name)}</small>`:''}</span><span class="candidate-eval">${displayScore(line,new Chess(f.before).turn())}</span><span class="candidate-arrow">↗</span></button>`;
     }).join('')}</div><div id="candidate-explanation">${variationExplanation()}</div>${!gentle&&!current.finished?'</details>':''}`;
-    html+=`</div><div class="coach-overview"><div class="decision-buttons"><button class="button secondary" id="retry" ${busy?'disabled':''}>↶ Retry this move</button>${f.actual?.pv?.length>1?`<button class="button secondary" id="show-punishment" ${busy?'disabled':''}>${gentle?'Explore continuation':f.grade.label==='Missed mate'?'See missed mate':'See strongest reply'} ↗</button>`:''}</div>`;
+    html+=`</div><div class="coach-overview"><div class="decision-buttons"><button class="button secondary" id="retry" ${busy?'disabled':''}>↶ Retry this move</button>${f.actual?.pv?.length>1?`<button class="button secondary" id="show-punishment" ${busy?'disabled':''}>${gentle?'Explore continuation':decisionReplay(f)?.mode.startsWith('missed-')?'See what you missed':'See strongest reply'} ↗</button>`:''}</div>`;
 
   } else {
     html+=`<div class="coach-empty"><div class="empty-board" aria-hidden="true">♘</div><h3>${current?'Your move. Your discovery.':'A good habit starts here.'}</h3><p>${current?'Make a move. Your coach will explain the idea and show a better option when there is one.':'Choose an opening and a worthy opponent. Your coach will help you understand the choices between moves.'}</p>${!current?'<button class="button primary" id="start-first">Start your first practice ↗</button>':''}</div>`;
@@ -621,7 +621,7 @@ function reviewLessonMarkup(model,compact=false){
   if(!move)return '<div class="review-lesson"><strong>Starting position</strong><p>Use the arrows or choose a move to begin.</p></div>';
   const badge=entry?moveBadge(entry.grade):null,number=Number(move.before.split(' ')[5]);
   const heading=`<div class="review-lesson-heading"><strong>${number}${move.color==='w'?'.':'…'} ${esc(move.san)}</strong><span class="${badge?'grade-'+badge.tone:'review-unrated'}">${badge?esc(badge.symbol+' '+badge.label):'Analysing…'}</span></div>`;
-  if(compact){const c=entry?compareMove(entry,playerLevel()):null;return `<section class="review-lesson">${heading}<p>${esc(entry?.grade.severity>0&&c?.cause?c.cause:shortMoveIdea(move.before,{pv:[move.lan]}))}</p>${c&&c.bestSAN!==move.san?`<button class="best-move-preview-trigger" data-best-ply="${ply}" data-best-uci="${move.lan}">Better: <strong>${esc(c.bestSAN)}</strong> ↗</button>`:''}${entry?.grade.severity>0&&decisionReplay(entry)?`<button class="best-move-preview-trigger" data-review-punishment="${ply}">${c?.missedMate?'See missed mate':'See punishment'} ↗</button>`:''}<div class="review-step-controls"><button class="icon-button" data-review-step="-1" aria-label="Previous review move" ${ply<0?'disabled':''}>←</button><span>${ply+1} / ${model.total}</span><button class="icon-button" data-review-step="1" aria-label="Next review move" ${ply>=model.total-1?'disabled':''}>→</button></div></section>`;}
+  if(compact){const c=entry?compareMove(entry,playerLevel()):null;return `<section class="review-lesson">${heading}<p>${esc(entry?.grade.severity>0&&c?.cause?c.cause:shortMoveIdea(move.before,{pv:[move.lan]}))}</p>${c&&c.bestSAN!==move.san?`<button class="best-move-preview-trigger" data-best-ply="${ply}" data-best-uci="${move.lan}">Better: <strong>${esc(c.bestSAN)}</strong> ↗</button>`:''}${entry?.grade.severity>0&&decisionReplay(entry)?`<button class="best-move-preview-trigger" data-review-punishment="${ply}">${c?.missedMate?'See missed mate':c?.missedOpportunity?'See missed chance':'See punishment'} ↗</button>`:''}<div class="review-step-controls"><button class="icon-button" data-review-step="-1" aria-label="Previous review move" ${ply<0?'disabled':''}>←</button><span>${ply+1} / ${model.total}</span><button class="icon-button" data-review-step="1" aria-label="Next review move" ${ply>=model.total-1?'disabled':''}>→</button></div></section>`;}
   return `<section class="review-lesson">${heading}${entry?moveExplanationMarkup(entry):`<p>${esc(moveInWords(move))}</p><p>${esc(shortMoveIdea(move.before,{pv:[move.lan]}))}</p>`}${entry?.grade.severity>0&&(isFreePlay()||move.color===current.color)?`<button class="button secondary" data-review-retry="${ply}">↶ Try a better move</button>`:''}</section>`;
 }
 function reviewGraphMarkup(model){
@@ -704,7 +704,7 @@ async function makeMove(from,to,promotion='q',recovered=null) {
   if(legal.some(m=>m.promotion) && arguments.length<3) { choosePromotion(from,to); return; }
   const token=generation, before=game.fen(), book=bookOptions(getOpening(),game.history()), ply=game.history().length;
   const wasRetry=recovered?.retry ?? (retrying || !!current.parentId), wasAssisted=recovered?.assisted ?? (coachOn || retrying || !!current.parentId || usedCoachHelp(current,before,ply));
-  state.settings.guidedTour={...state.settings.guidedTour,start:true,best:true};
+  state.settings.guidedTour={...state.settings.guidedTour,start:true};
   const move=game.move({from,to,promotion}); current.moves.push(move.lan);
   current.pending={before,uci:move.lan,retry:wasRetry,assisted:wasAssisted};
   selected=null; preview=null; arrow=null; coachHelp=null; mobileCoachView='coach';tab='coach';busy=true; render(); await persist();
@@ -778,7 +778,7 @@ function bestPreviewMarkup() {
 function previewBestMove(ply,uci) {
   if(busy || !current || preview?.bestAlternative || coachHelp?.stage==='loading')return;
   const attempt=current.finished?reviewModel(current).entries.get(ply):[...current.attempts].reverse().find(a=>a.ply===ply&&a.uci===uci);
-  const missed=decisionReplay(attempt);if(missed?.mode==='missed-mate'){openReplay({...missed,flipped});return;}
+  const missed=decisionReplay(attempt);if(missed?.mode.startsWith('missed-')){openReplay({...missed,flipped});return;}
   const result=bestMovePreview(current,attempt,playerLevel());
   if(!result){toast('No saved best-move line is available for this decision.');return;}
   const returnState={preview,coachHelp,focus,tab,mobileCoachView,mobilePreviewExpanded,arrow};
@@ -851,7 +851,7 @@ function forkFromHistory(autoReply=true) {
   if(autoReply && game.turn()!==current.color)opponentTurn();
 }
 function showPlayedLine() {
-  const missed=decisionReplay(focus);if(missed?.mode==='missed-mate'){openReplay({...missed,flipped});return;}
+  const missed=decisionReplay(focus);if(missed?.mode.startsWith('missed-')){openReplay({...missed,flipped});return;}
   const line=focus?.actual;if(!line?.pv?.length)return;
   preview={fen:focus.before,label:`Strongest reply to ${focus.san}`,base:focus.before,line:line.pv,step:0};
   preview.details={text:`The engine’s strongest continuation against ${focus.san}.`,moves:sanLine(focus.before,line.pv,12).join('  '),note:'Step forward to see the reply and how the position develops. Your chosen-strength opponent may play a different move.'};
@@ -1001,30 +1001,61 @@ function releaseDrag(e,cancelled=false) {
 document.addEventListener('pointerup',e=>releaseDrag(e));
 document.addEventListener('pointercancel',e=>releaseDrag(e,true));
 window.addEventListener('blur',()=>{if(dragState)releaseDrag({pointerId:dragState.pointerId,clientX:0,clientY:0},true);});
-let guideStep=null,guideFrame;
+let guideStep=null,guideFrame,guideWakeTimer,guideAnimationId=null,spotlightAnimationId=null,guideShownAtDecision=null;
+const guidePageOpenedAt=Date.now();let guideLastInputAt=Date.now();
 function scheduleGuide(){cancelAnimationFrame(guideFrame);guideFrame=requestAnimationFrame(paintGuide);}
 function hideGuide(){const card=$('#guide-card');if(card)card.hidden=true;const spotlight=$('#guide-spotlight');if(spotlight)spotlight.setAttribute('hidden','');}
 function guideTarget(){return guideStep?$(guideStep.target):null;}
-function completeGuide(){
-  if(!guideStep)return;
-  state.settings.guidedTour={...state.settings.guidedTour,[guideStep.id]:true};persist();guideStep=null;paintGuide();
+function guideProgress(){return {decisions:guideDecisionCount(state.games),now:Date.now()};}
+function markGuideUsed(ids){
+  if(!state)return;
+  const active=guideStep&&ids.includes(guideStep.id);if(!active&&ids.every(id=>state.settings.guidedTour?.[id]))return;const progress=guideProgress();
+  state.settings.guidedTour={...state.settings.guidedTour,...Object.fromEntries(ids.map(id=>[id,true])),...(active&&guideStep.id!=='start'?{_lastDecision:progress.decisions,_lastAt:progress.now}:{})};
+  if(active){guideStep=null;guideShownAtDecision=null;guideAnimationId=null;spotlightAnimationId=null;hideGuide();}
+  persist();scheduleGuide();
+}
+function completeGuide(){if(guideStep)markGuideUsed([guideStep.id]);}
+function postponeGuide(){
+  if(!guideStep)return;const {decisions,now}=guideProgress(),seen=state.settings.guidedTour||{};
+  state.settings.guidedTour=guideStep.id==='start'?{...seen,start:true}:{...seen,_lastDecision:decisions,_lastAt:now,_snoozed:{...seen._snoozed,[guideStep.id]:decisions+5}};
+  guideStep=null;guideShownAtDecision=null;guideAnimationId=null;spotlightAnimationId=null;hideGuide();persist();scheduleGuide();
+}
+function tryGuide(){
+  const target=guideTarget();if(!target)return;
+  const rect=target.getBoundingClientRect();
+  if(rect.top<0||rect.bottom>innerHeight){target.scrollIntoView({behavior:'smooth',block:'center'});return;}
+  if(guideStep.id==='feedback'||guideStep.id==='punishment')target.querySelector('[data-mini-enlarge]')?.click();else target.click();
 }
 function paintGuide(){
-  const card=$('#guide-card');if(!state||!card)return;
+  const card=$('#guide-card');if(!state||!card)return;clearTimeout(guideWakeTimer);
+  const progress=guideProgress(),seen=state.settings.guidedTour||{};
+  if(seen.skipped){guideStep=null;guideShownAtDecision=null;hideGuide();return;}
+  if(guideStep&&guideShownAtDecision!==progress.decisions){postponeGuide();return;}
   document.querySelectorAll('.guide-target').forEach(el=>el.classList.remove('guide-target'));
-  if($('dialog[open]')||$('#piece-grade-popover').matches(':popover-open')||positionEditor||preview?.line||!engineReady){hideGuide();return;}
+  if($('dialog[open]')||$('#piece-grade-popover').matches(':popover-open')||positionEditor||preview?.line||!engineReady||busy||dragState?.active||document.hidden){hideGuide();return;}
   const feedback=$('.best-move-lesson'),alternatives=$('[data-previous-options]'),opponent=$('.opponent-context'),next=$('[data-next-options]');
-  guideStep=nextGuideStep({hasGame:!!current,hasGames:state.games.length>0,finished:current?.finished,ready:canAskCoach(),badge:!current?.finished&&!busy&&!!$('#piece-move-grade'),feedback:!current?.finished&&!!focus&&!!feedback,alternatives:!current?.finished&&!!focus&&!!alternatives,opponent:!current?.finished&&!!current?.attempts.length&&!!opponent,next:!current?.finished&&!!current?.attempts.length&&!!next&&humanTurn()&&!busy,bad:!!focus&&focus.grade?.severity>0&&!!$('.consequence-replay')},state.settings.guidedTour);
+  const context={hasGame:!!current,hasGames:state.games.length>0,finished:current?.finished,ready:!!current&&humanTurn()&&!busy,decisions:progress.decisions,now:progress.now,pageAgeMs:progress.now-guidePageOpenedAt,idleMs:progress.now-guideLastInputAt,badge:!!$('#piece-move-grade'),feedback:!!focus&&!!feedback,alternatives:!!focus&&!!alternatives,opponent:!!current?.attempts.length&&!!opponent,next:!!next,bad:!!focus&&focus.grade?.severity>0&&!!$('.consequence-replay'),opportunity:!!focus&&!!$('.missed-opportunity-lesson')};
+  if(!guideStep)guideStep=nextGuideStep(context,seen);
+  if(!guideStep){
+    const delay=Math.max(0,!current?3000-context.pageAgeMs:0,2500-context.idleMs,seen._lastAt?30000-(progress.now-seen._lastAt):0);
+    if(delay>0&&!seen.skipped)guideWakeTimer=setTimeout(scheduleGuide,delay+30);
+  }
   const target=guideTarget();if(!target||!target.getClientRects().length){hideGuide();return;}
+  if(guideShownAtDecision==null)guideShownAtDecision=progress.decisions;
   target.classList.add('guide-target');card.hidden=false;
   const rect=target.getBoundingClientRect(),visible=rect.top>=0&&rect.top<innerHeight-80&&rect.bottom>0;
-  const i=GUIDE_STEPS.findIndex(s=>s.id===guideStep.id);
-  card.innerHTML=`<div class="guide-label"><span>${guideStep.id==='start'?'Welcome to betweenmoves':'A little guidance'}</span><button data-guide-skip aria-label="Skip getting started tips">×</button></div><h3>${esc(guideStep.title)}</h3><p>${esc(guideStep.text)}</p><div class="guide-actions"><span class="guide-progress" aria-hidden="true">${GUIDE_STEPS.map((s,n)=>`<i class="${n===i?'active':''}"></i>`).join('')}</span>${!visible?'<button class="guide-show" data-guide-show>Show me</button>':''}<button ${guideStep.id==='start'?'data-guide-start':'data-guide-next'}>${guideStep.action||'Got it →'}</button></div>`;
+  const contentKey=`${guideStep.id}|${guideStep.title}|${visible}`;
+  if(card.dataset.guideContent!==contentKey){
+  card.innerHTML=`<div class="guide-label"><span>${guideStep.id==='start'?'Welcome to betweenmoves':'A small tip'}</span><button data-guide-skip aria-label="Turn off tips" title="Turn off tips">×</button></div><h3>${esc(guideStep.title)}</h3><p>${esc(guideStep.text)}</p><div class="guide-actions"><button class="guide-show" data-guide-later>Not now</button><button ${guideStep.id==='start'?'data-guide-start':'data-guide-try'}>${guideStep.action||(visible?'Try it':'Show me')}</button></div>`;
+    card.dataset.guideContent=contentKey;
+  }
   const w=card.offsetWidth,h=card.offsetHeight,left=visible?Math.min(innerWidth-w-12,Math.max(12,rect.right-w)):Math.max(12,(innerWidth-w)/2);
   const top=visible?(rect.bottom+h+36<innerHeight?rect.bottom+30:Math.max(12,rect.top-h-30)):Math.max(12,innerHeight-h-14);
   card.style.left=`${left}px`;card.style.top=`${top}px`;
   const spotlight=$('#guide-spotlight');spotlight.toggleAttribute('hidden',!visible);
+  if(guideAnimationId!==guideStep.id){card.classList.remove('guide-enter');void card.offsetWidth;card.classList.add('guide-enter');guideAnimationId=guideStep.id;}
   if(visible){
+    if(spotlightAnimationId!==guideStep.id){spotlight.classList.remove('guide-spotlight-enter');void spotlight.getBoundingClientRect();spotlight.classList.add('guide-spotlight-enter');spotlightAnimationId=guideStep.id;}
     const x=Math.max(3,rect.left-6),y=Math.max(3,rect.top-6),right=Math.min(innerWidth-3,rect.right+6),bottom=Math.min(innerHeight-3,rect.bottom+6),cx=Math.max(x+8,Math.min(right-8,left+w/2));
     const above=top+h<=rect.top,startY=above?top+h:top,endY=above?y:bottom;
     spotlight.setAttribute('viewBox',`0 0 ${innerWidth} ${innerHeight}`);
@@ -1039,14 +1070,14 @@ function paintEnlargedReplay(){
   const board=new Chess(frame.fen),pieceValue={p:1,n:3,b:3,r:5,q:9,k:0};
   const balance=board.board().flat().filter(Boolean).reduce((n,p)=>n+(p.color==='w'?1:-1)*pieceValue[p.type],0);
   const lesson=replayLesson(r.fen,r.pv,index,{punishment:r.punishment,mode:r.mode});
-  $('#replay-body').innerHTML=`${miniLineMarkup(r.fen,r.pv,r.flipped,{initial:Math.max(1,index),limit:r.limit,arrows:true,highlights:lesson})}<div class="replay-highlight-key"><span>Move / idea</span><span>Threat</span>${lesson?.marks.some(m=>m.role==='pin')?'<span>Pin</span>':''}</div><section class="replay-coach-lesson" aria-live="polite"><h3>${esc(lesson?.heading||frame.label)}</h3><p>${esc(lesson?.reason||frame.words)}</p>${lesson?.watch?`<p class="replay-watch">${esc(lesson.watch)}</p>`:''}${lesson?.impact?`<p class="replay-impact">${esc(lesson.impact)}</p>`:''}</section><div class="replay-step-controls"><button class="button secondary" data-replay-step="-1" aria-label="Previous replay move" ${index===0?'disabled':''}>←</button><span>${index} / ${frames.length-1}</span><button class="button secondary" data-replay-step="1" aria-label="Next replay move" ${index===frames.length-1?'disabled':''}>→</button></div><p class="replay-outcome">${board.isCheckmate()?`Checkmate · ${board.turn()==='w'?'Black':'White'} wins`:board.isDraw()?'Draw':board.isCheck()?'Check · the king must respond':balance===0?'Material is level':`${balance>0?'White':'Black'} has ${Math.abs(balance)} more points of material`}</p><small>${r.loading?(r.mode==='missed-mate'?'Finding the mating continuation…':'Finding a longer continuation…'):r.error?'Couldn’t extend the line. You can still replay the saved moves.':r.mode==='missed-mate'?'The mate you could have played, against the best defence.':r.punishment?'Best play for both sides · up to six moves each, or until the game ends.':'One possible continuation.'} Your game stays unchanged.</small>`;
+  $('#replay-body').innerHTML=`${miniLineMarkup(r.fen,r.pv,r.flipped,{initial:Math.max(1,index),limit:r.limit,arrows:true,highlights:lesson})}<div class="replay-highlight-key"><span>Move / idea</span><span>Threat</span>${lesson?.marks.some(m=>m.role==='pin')?'<span>Pin</span>':''}</div><section class="replay-coach-lesson" aria-live="polite"><h3>${esc(lesson?.heading||frame.label)}</h3><p>${esc(lesson?.reason||frame.words)}</p>${lesson?.watch?`<p class="replay-watch">${esc(lesson.watch)}</p>`:''}${lesson?.impact?`<p class="replay-impact">${esc(lesson.impact)}</p>`:''}</section><div class="replay-step-controls"><button class="button secondary" data-replay-step="-1" aria-label="Previous replay move" ${index===0?'disabled':''}>←</button><span>${index} / ${frames.length-1}</span><button class="button secondary" data-replay-step="1" aria-label="Next replay move" ${index===frames.length-1?'disabled':''}>→</button></div><p class="replay-outcome">${board.isCheckmate()?`Checkmate · ${board.turn()==='w'?'Black':'White'} wins`:board.isDraw()?'Draw':board.isCheck()?'Check · the king must respond':balance===0?'Material is level':`${balance>0?'White':'Black'} has ${Math.abs(balance)} more points of material`}</p><small>${r.loading?(r.mode==='missed-mate'?'Finding the mating continuation…':'Finding a longer continuation…'):r.error?'Couldn’t extend the line. You can still replay the saved moves.':r.mode==='missed-mate'?'The mate you could have played, against the best defence.':r.mode==='missed-opportunity'?'Your better line, against the best defence.':r.punishment?'Best play for both sides · up to six moves each, or until the game ends.':'One possible continuation.'} Your game stays unchanged.</small>`;
   const mini=$('#replay-body .mini-line-preview');mini.querySelectorAll('[data-mini-frame]').forEach((f,i)=>f.classList.toggle('is-current',i===index));mini.querySelector('.mini-caption').textContent=frame.label;
 }
 function stepEnlargedReplay(delta){if(enlargedReplay){enlargedReplay.step=Math.max(0,enlargedReplay.step+delta);paintEnlargedReplay();}}
 async function openReplay(mini){
   stopMiniReplay();const token=++replayRequest;
   enlargedReplay=mini.dataset?{fen:mini.dataset.miniFen,pv:JSON.parse(mini.dataset.miniPv),flipped:mini.dataset.miniFlipped==='true',punishment:mini.dataset.miniPunishment==='true',mode:mini.dataset.miniMode,limit:Number(mini.dataset.miniLimit),step:1}:{...mini,step:1};
-  const r=enlargedReplay;r.loading=r.punishment||r.mode==='missed-mate';$('#replay-title').textContent=r.mode==='missed-mate'?'The mate you missed':r.punishment?'How this move can be punished':'Move replay';paintEnlargedReplay();hideGuide();$('#replay-dialog').showModal();
+  const r=enlargedReplay;r.loading=r.punishment||r.mode?.startsWith('missed-');$('#replay-title').textContent=r.mode==='missed-mate'?'The mate you missed':r.mode==='missed-opportunity'?'The opportunity you missed':r.punishment?'How this move can be punished':'Move replay';paintEnlargedReplay();hideGuide();$('#replay-dialog').showModal();
   if(!r.loading)return;
   try{r.pv=await extendReplayLine(r.fen,r.pv,fen=>engine.search(fen,{count:1,ms:650}),{limit:r.limit,active:()=>token===replayRequest&&$('#replay-dialog').open});}catch{r.error=true;}
   if(token===replayRequest&&$('#replay-dialog').open){r.loading=false;paintEnlargedReplay();}
@@ -1067,10 +1098,15 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b || b.disabled)return;
   if(positionEditor && !b.dataset.editorTurn && !['resume-play','editor-undo','editor-cancel','flip','reset-board'].includes(b.id)){toast('Resume or cancel your position edits first.');return;}
   if(b.dataset.editorTurn&&positionEditor){positionEditor.turn=b.dataset.editorTurn;$('#position-editor-error').hidden=true;drawBoard();return;}
-  if(b.hasAttribute('data-guide-next')){completeGuide();return;}
+  if(b.hasAttribute('data-guide-later')){postponeGuide();return;}
+  if(b.hasAttribute('data-guide-try')){tryGuide();return;}
   if(b.hasAttribute('data-guide-skip')){state.settings.guidedTour={...state.settings.guidedTour,skipped:true};persist();paintGuide();return;}
   if(b.hasAttribute('data-guide-start')){completeGuide();setup();return;}
   if(b.hasAttribute('data-guide-show')){guideTarget()?.scrollIntoView({behavior:'smooth',block:'center'});return;}
+  if(b.id==='new-game')markGuideUsed(['start']);
+  if(b.id==='mobile-best-move')markGuideUsed(['best']);
+  if(['piece-move-grade','mobile-move-grade','badge-help'].includes(b.id))markGuideUsed(['badge']);
+  if(b.hasAttribute('data-mini-enlarge')||b.hasAttribute('data-mini-replay')||b.dataset.bestPly!=null){const source=b.closest('.best-move-lesson,.consequence-replay,.next-move-option');if(source?.matches('.consequence-replay')||source?.matches('.missed-opportunity-lesson'))markGuideUsed(['punishment']);if(source?.matches('.best-move-lesson'))markGuideUsed(['feedback']);}
   if(guideStep&&b.matches(guideStep.target))completeGuide();
   if(b.hasAttribute('data-mini-enlarge')){openReplay(b.closest('.mini-line-preview'));return;}
   if(b.dataset.replayStep){stepEnlargedReplay(Number(b.dataset.replayStep));return;}
@@ -1121,7 +1157,7 @@ document.addEventListener('change',e=>{
 // Capture the user's choice before an asynchronous render can replace the node.
 document.addEventListener('click',e=>{
   const summary=e.target.closest('summary'),details=summary?.parentElement;
-  if(details?.matches('details[data-coach-section]'))rememberSection(details.dataset.coachSection,!details.open);
+  if(details?.matches('details[data-coach-section]')){rememberSection(details.dataset.coachSection,!details.open);const learned={'next-moves':'next','previous-alternatives':'alternatives','opponent-plan':'opponent'}[details.dataset.coachSection];if(learned&&!details.open)markGuideUsed([learned]);}
 },true);
 document.addEventListener('toggle',e=>{
   const details=e.target;
@@ -1131,6 +1167,8 @@ document.addEventListener('pointerdown',e=>{gradeTriggerWasOpen=!!e.target.close
 $('#piece-grade-popover').addEventListener('toggle',e=>{scheduleGuide();if(e.newState==='closed'){mobileGradeOpen=false;for(const b of document.querySelectorAll('[aria-controls="piece-grade-popover"]'))b.setAttribute('aria-expanded','false');}});
 window.addEventListener('scroll',()=>{closeGradePopover();scheduleGuide();},{passive:true});
 $('#setup').addEventListener('close',scheduleGuide);
+for(const event of ['pointerdown','keydown','scroll'])window.addEventListener(event,()=>{guideLastInputAt=Date.now();if(!guideStep)scheduleGuide();},{passive:true});
+document.addEventListener('visibilitychange',scheduleGuide);
 let resizeFrame;
 window.addEventListener('resize',()=>{closeGradePopover();cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(render);});
 document.addEventListener('keydown',e=>{if($('#replay-dialog').open&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();stepEnlargedReplay(e.key==='ArrowLeft'?-1:1);return;}if(positionEditor){if(e.key==='Escape')cancelPositionEditor();return;}if(e.key==='Escape' && $('#piece-grade-popover').matches(':popover-open')){e.preventDefault();closeGradePopover(true);return;}if(e.target.matches('input,select,textarea')||$('dialog[open]'))return;if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();if(preview?.line)stepPreview(e.key==='ArrowLeft'?-1:1);else stepHistory(e.key==='ArrowLeft'?-1:1);} if(e.key==='Escape'&&preview)returnToGame();});
