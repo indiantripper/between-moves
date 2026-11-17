@@ -49,7 +49,7 @@ let mobileDestination='board';
 let renderedPanelKey=null;
 let positionEditor=null, gradeTriggerWasOpen=false;
 let mobileGradeOpen=false, mobileGradeKey=null;
-let coachHelp=null, mobileCoachView='coach', mobilePreviewExpanded=false,opponentExpandedKey=null;
+let coachHelp=null, mobileCoachView='coach', mobilePreviewExpanded=false;
 const engine = new Engine(`${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`);
 let meterEngine=null;
 const positionAnalysis=new LatestPositionAnalysis(async fen=>{
@@ -104,6 +104,12 @@ function persist() {
   saveQueue = saveQueue.then(()=>writeState(db,snapshot)).catch(()=> { $('.local-badge').textContent='Storage unavailable — export a backup'; toast('Could not save in this browser. Export a backup to keep your history.'); });
   return saveQueue;
 }
+function sectionOpen(key,fallback=false){return state?.settings?.expandedSections?.[key]??fallback;}
+function sectionAttributes(key,fallback=false){return `data-coach-section="${key}" ${sectionOpen(key,fallback)?'open':''}`;}
+function rememberSection(key,open){
+  if(!state||sectionOpen(key)===open)return;
+  state.settings.expandedSections||={};state.settings.expandedSections[key]=open;persist();
+}
 function historyGame(record = current) { const g = new Chess(record?.startFen); for (const move of record?.moves || []) g.move(uciMove(move)); return g; }
 function shownGame() { if(positionEditor)return new Chess(positionEditor.fen,{skipValidation:true});return preview?.historyPly!=null?positionAt(current,preview.historyPly):preview?new Chess(preview.fen):game; }
 function restoreCoaching(record) { intensity=savedIntensity(record);coachOn=intensity!=='silent'; }
@@ -124,10 +130,9 @@ function opponentIdeaMarkup() {
   if(!idea)return '';
   const planVisual=idea.planPreview?`<div class="opponent-plan-visual"><div><small>One possible continuation</small><p>You: <strong>${esc(idea.planPreview.reply)}</strong><br>${idea.side}: <strong>${esc(idea.planPreview.followup)}</strong></p></div>${miniLineMarkup(idea.planPreview.fen,idea.planPreview.pv,flipped,{initial:2,arrows:true})}</div>`:`<div class="opponent-plan-visual"><div><small>Their last move</small><p>${esc(moveInWords(move))}</p></div>${miniLineMarkup(move.before,[move.lan],flipped,{arrows:true})}</div>`;
   const content=`<div class="opponent-idea"><span class="opponent-idea-label">${next?`NEXT ${idea.side.toUpperCase()} REPLY`:`${idea.side.toUpperCase()}’S IDEA`} · ${esc(idea.san)}</span><p>${esc(idea.reason)}</p><p><strong>Possible plan:</strong> ${esc(idea.plan)}</p>${planVisual}${idea.watch?`<p class="opponent-idea-watch"><strong>Watch:</strong> ${esc(idea.watch)}</p>`:''}</div>`;
-  const opponentKey=`${current.id}|${index}|${move.lan}`;
-  return focus?`<details class="opponent-context" data-opponent-key="${esc(opponentKey)}" ${opponentExpandedKey===opponentKey?'open':''}><summary>${idea.side}’s last move · ${esc(idea.san)}</summary>${content}</details>`:content;
+  return focus?`<details class="opponent-context" ${sectionAttributes('opponent-plan')}><summary>${idea.side}’s last move · ${esc(idea.san)}</summary>${content}</details>`:content;
 }
-function paintOpponentIdea() { const slot=$('#opponent-idea-slot');if(slot){const open=slot.querySelector('details')?.open;slot.innerHTML=opponentIdeaMarkup();if(open&&slot.querySelector('details'))slot.querySelector('details').open=true;} }
+function paintOpponentIdea() { const slot=$('#opponent-idea-slot');if(slot)slot.innerHTML=opponentIdeaMarkup(); }
 function evaluationState() {
   const shown=shownGame(),state=positionAnalysis.state?.fen===shown.fen()?positionAnalysis.state:null;
   return {shown,state,model:positionEvaluation(shown,state?.analysis)};
@@ -317,6 +322,7 @@ function paintMobilePreview() {
   card.classList.remove('best-alternative-card');
   $('.play-area').classList.toggle('coach-preview-active',!!lesson);
   if(!lesson){mobilePreviewExpanded=false;card.classList.remove('is-expanded');card.innerHTML='';return;}
+  mobilePreviewExpanded=sectionOpen('preview-explanation');
   card.classList.toggle('is-expanded',mobilePreviewExpanded);
   card.innerHTML=`
     <div class="mobile-preview-heading">
@@ -345,7 +351,7 @@ function togglePreviewExplanation() {
   if(!preview?.line)return;
   const card=$('#mobile-preview-coach'),button=$('#mobile-preview-details');
   const top=window.scrollY,left=window.scrollX;
-  mobilePreviewExpanded=!mobilePreviewExpanded;
+  mobilePreviewExpanded=!mobilePreviewExpanded;rememberSection('preview-explanation',mobilePreviewExpanded);
   card.classList.toggle('is-expanded',mobilePreviewExpanded);
   $('#mobile-preview-extra').hidden=!mobilePreviewExpanded;
   button.setAttribute('aria-expanded',String(mobilePreviewExpanded));
@@ -364,7 +370,7 @@ function coachHelpMarkup() {
   const roles=new Set(annotations?.marks.map(m=>m.role));
   const legend=annotations?.marks.length?`<div class="coach-highlight-legend" aria-label="Board highlights">${[['move','Move'],['threat','! Threat'],['pin','P Pin / queen line'],['support','Support'],['idea','Key square']].filter(([role])=>roles.has(role)).map(([role,label])=>`<span class="legend-${role}">${label}</span>`).join('')}<small>Red dashed = possible reply</small></div>`:'';
   const original=h.suggestion?`<p>Move your ${esc(h.suggestion.piece)} from ${h.suggestion.from} to ${h.suggestion.to}.</p><p>${esc(h.suggestion.idea)}</p><p class="eyebrow">ONE ENGINE CONTINUATION</p><p class="help-line">${esc(h.suggestion.line.join('  '))}</p>`:'';
-  let text=h.stage==='loading'?'<h3>Finding a useful move…</h3><p>Analysing the position on your board.</p>':h.stage==='error'?`<h3>Couldn’t analyse this position</h3><p>${esc(h.error)}</p><button class="button secondary" id="coach-retry-help">Try again</button>`:h.stage==='hint'?`<h3>A hint first</h3><p>${esc(h.suggestion.hint)}</p><button class="button primary" id="coach-show-move">Show move + idea</button>`:`<h3>${esc(lesson?.heading || 'Consider '+h.suggestion.san)}</h3>${legend}${lesson?`<div class="coach-step-lesson" data-step="${lesson.step}"><span class="eyebrow">MOVE ${lesson.step} OF ${lesson.total}</span><p class="move-in-words">${esc(lesson.words)}</p><p><strong>Idea:</strong> ${esc(lesson.reason)}</p>${lesson.actor==='opponent'?`<p><strong>Possible plan:</strong> ${esc(lesson.plan)}</p>`:''}<p class="coach-step-watch"><strong>Watch:</strong> ${esc(lesson.watch)}</p>${lesson.next?`<p class="coach-step-next"><strong>Next in this line:</strong> ${esc(lesson.next)}</p>`:''}</div>`:''}<div class="coach-preview-actions"><button class="button secondary" id="coach-preview-move">Preview move</button>${h.suggestion.pv.length>1?'<button class="button secondary" id="coach-preview-reply">Preview reply</button>':''}<button class="button primary" id="coach-play-move" ${canPlayCoachMove()?'':'disabled'}>${lesson?'Play '+esc(h.suggestion.san):'Play this move'}</button></div>${lesson?`<details class="coach-original-idea"><summary>Original suggestion & full line</summary>${original}</details>`:original}<small>One possible continuation. Your opponent may choose another reply.</small>`;
+  let text=h.stage==='loading'?'<h3>Finding a useful move…</h3><p>Analysing the position on your board.</p>':h.stage==='error'?`<h3>Couldn’t analyse this position</h3><p>${esc(h.error)}</p><button class="button secondary" id="coach-retry-help">Try again</button>`:h.stage==='hint'?`<h3>A hint first</h3><p>${esc(h.suggestion.hint)}</p><button class="button primary" id="coach-show-move">Show move + idea</button>`:`<h3>${esc(lesson?.heading || 'Consider '+h.suggestion.san)}</h3>${legend}${lesson?`<div class="coach-step-lesson" data-step="${lesson.step}"><span class="eyebrow">MOVE ${lesson.step} OF ${lesson.total}</span><p class="move-in-words">${esc(lesson.words)}</p><p><strong>Idea:</strong> ${esc(lesson.reason)}</p>${lesson.actor==='opponent'?`<p><strong>Possible plan:</strong> ${esc(lesson.plan)}</p>`:''}<p class="coach-step-watch"><strong>Watch:</strong> ${esc(lesson.watch)}</p>${lesson.next?`<p class="coach-step-next"><strong>Next in this line:</strong> ${esc(lesson.next)}</p>`:''}</div>`:''}<div class="coach-preview-actions"><button class="button secondary" id="coach-preview-move">Preview move</button>${h.suggestion.pv.length>1?'<button class="button secondary" id="coach-preview-reply">Preview reply</button>':''}<button class="button primary" id="coach-play-move" ${canPlayCoachMove()?'':'disabled'}>${lesson?'Play '+esc(h.suggestion.san):'Play this move'}</button></div>${lesson?`<details class="coach-original-idea" ${sectionAttributes('original-line')}><summary>Original suggestion & full line</summary>${original}</details>`:original}<small>One possible continuation. Your opponent may choose another reply.</small>`;
   return `<section class="coach-help" aria-live="polite"><span class="eyebrow">COACH · ${preview?.coach?'BOARD PREVIEW':preview?'DISPLAYED POSITION':'YOUR CURRENT POSITION'}</span>${text}<button class="button subtle" id="coach-dismiss">${preview?.coach?'Return to game':'Close'}</button></section>`;
 }
 async function askCoach({direct=true}={}) {
@@ -457,7 +463,7 @@ function render() {
   if(panelKey!==renderedPanelKey){$('#panel-content').scrollTop=0;renderedPanelKey=panelKey;}
 }
 // Suggestions are keyed to the displayed position, never the previous attempt.
-let nextMoves=null,nextExpandedFen=null,previousExpandedKey=null;
+let nextMoves=null;
 function nextMovePosition() {
   if(!current || positionEditor || preview?.line || busy || !engineReady || !coaching().guidance || current.finished)return null;
   const board=shownGame();
@@ -499,8 +505,7 @@ function previousMoveOptionsMarkup(attempt) {
   const alternatives=(attempt.lines||[]).filter(line=>{
     const uci=line.pv?.[0];if(!uci||seen.has(uci))return false;seen.add(uci);return true;
   });
-  const key=`${current.id}|${attempt.ply}|${attempt.uci}`;
-  return `<details class="next-options previous-options" data-previous-options data-attempt="${esc(key)}" ${previousExpandedKey===key?'open':''}><summary>Other moves I could have played <span>Instead of ${esc(attempt.san)}</span></summary><div class="next-move-options">${alternatives.map((line,i)=>{
+  return `<details class="next-options previous-options" data-previous-options ${sectionAttributes('previous-alternatives')}><summary>Other moves I could have played <span>Instead of ${esc(attempt.san)}</span></summary><div class="next-move-options">${alternatives.map((line,i)=>{
     const grade=gradeMove(attempt.lines[0],line,line.pv[0]===attempt.lines[0].pv[0]);
     return moveOptionMarkup(attempt.before,line,i,line.pv[0]===attempt.lines[0].pv[0]?'Best move':grade.severity===0?'Good alternative':'Less strong');
   }).join('')}</div>${alternatives.length?'<small class="next-moves-note">Replay an alternative and a possible reply. Your game stays unchanged.</small>':'<p class="next-moves-status">No other analysed moves are available for this turn.</p>'}</details>`;
@@ -520,7 +525,7 @@ function renderCoach(active) {
   ensureNextMoves();
   const fen=nextMovePosition();
   if(!fen){$('#panel-content').innerHTML=html+`<p class="next-moves-status">${current.paused?'Tap ▶ beside the coach icon to resume play.':game.isGameOver()?'Game over. Review your moves to learn from this game.':busy||!engineReady?'Thinking… Suggestions will follow.':positionEditor?'Finish arranging the position to see suggestions.':'Waiting for the opponent’s reply…'}</p>`;return;}
-  html+=`<details class="next-options" data-next-options data-position="${esc(fen)}" ${nextExpandedFen===fen?'open':''}><summary>Explore my next moves <span>${new Chess(fen).turn()==='w'?'White':'Black'} to move</span></summary>`;
+  html+=`<details class="next-options" data-next-options ${sectionAttributes('next-moves')}><summary>Explore my next moves <span>${new Chess(fen).turn()==='w'?'White':'Black'} to move</span></summary>`;
   if(nextMoves.stage==='loading')html+='<p class="next-moves-status" role="status">Finding five moves and their ideas…</p>';
   else if(nextMoves.stage==='error')html+='<p>No suggestions available yet.</p><button class="button secondary" data-next-retry>Try again</button>';
   else html+=`<div class="next-move-options">${nextMoves.choices.map((choice,i)=>moveOptionMarkup(fen,choice.line,i,i===0?'Best move':choice.grade.severity===0?'Good alternative':'Less strong')).join('')}</div><small class="next-moves-note">Tap Replay to see the move and a possible reply. Your game stays unchanged.</small>`;
@@ -541,7 +546,7 @@ function renderLegacyCoach(active) {
   } else if (f && (coachOn || !active)) {
     const grade=f.grade;
     html+=`<div class="feedback-card ${gentle?'gentle-feedback':'severity-'+grade.severity}"><div class="feedback-top"><span class="move-token">${isFreePlay()?(new Chess(f.before).turn()==='w'?'White · ':'Black · '):''}${esc(f.san)}</span>${gentle?'<strong>The idea</strong>':`<strong>${esc(grade.label)}</strong><span class="feedback-symbol">${grade.severity>=1?'?!':'✓'}</span>`}</div>${gentle?`<p class="move-in-words">${esc(moveWords(f.before,f.uci))}</p><p>${esc(f.actual?explainCandidate(f.before,f.actual,playerLevel()):'Analysis was interrupted. Retry the move to explore its ideas.')}</p>`:moveExplanationMarkup(f)}<div id="opponent-idea-slot">${opponentIdeaMarkup()}</div></div>`;
-    html+=`</div><div class="coach-candidates">${!gentle&&!current.finished?`<details class="optional-alternatives" ${mobileCoachView==='five'?'open':''}><summary>Explore five alternatives</summary>`:''}<div class="section-heading"><h3>Five ways forward</h3><span>Before your ${esc(f.san)}</span></div><div class="candidate-labels"><span>ENGINE CHOICE</span><span>WHITE EVAL.</span></div><div class="candidates">${f.lines.map((line,i)=>{
+    html+=`</div><div class="coach-candidates">${!gentle&&!current.finished?`<details class="optional-alternatives" ${sectionAttributes('review-alternatives',mobileCoachView==='five')}><summary>Explore five alternatives</summary>`:''}<div class="section-heading"><h3>Five ways forward</h3><span>Before your ${esc(f.san)}</span></div><div class="candidate-labels"><span>ENGINE CHOICE</span><span>WHITE EVAL.</span></div><div class="candidates">${f.lines.map((line,i)=>{
       const san=sanLine(f.before,line.pv,1)[0], mine=line.pv[0]===f.uci, opening=openingForMove(f.before,line.pv[0]);
       return `<button class="candidate ${mine?'your-move':''}" data-candidate="${i}" ${busy?'disabled':''}><span class="candidate-rank">${i+1}</span><span class="candidate-description"><span class="candidate-title"><strong>${esc(san)}</strong>${mine?'<span class="mine-label">YOUR MOVE</span>':''}</span><small class="move-translation">${esc(moveWords(f.before,line.pv[0]))}</small>${opening?`<small>${esc(opening.name)}</small>`:''}</span><span class="candidate-eval">${displayScore(line,new Chess(f.before).turn())}</span><span class="candidate-arrow">↗</span></button>`;
     }).join('')}</div><div id="candidate-explanation">${variationExplanation()}</div>${!gentle&&!current.finished?'</details>':''}`;
@@ -978,7 +983,15 @@ document.addEventListener('change',e=>{
     mobileCoachView='coach';persist();render();
   }
 });
-document.addEventListener('toggle',e=>{if(e.target.matches('[data-next-options]'))nextExpandedFen=e.target.open?e.target.dataset.position:null;if(e.target.matches('[data-previous-options]'))previousExpandedKey=e.target.open?e.target.dataset.attempt:null;if(e.target.matches('[data-opponent-key]'))opponentExpandedKey=e.target.open?e.target.dataset.opponentKey:null;},true);
+// Capture the user's choice before an asynchronous render can replace the node.
+document.addEventListener('click',e=>{
+  const summary=e.target.closest('summary'),details=summary?.parentElement;
+  if(details?.matches('details[data-coach-section]'))rememberSection(details.dataset.coachSection,!details.open);
+},true);
+document.addEventListener('toggle',e=>{
+  const details=e.target;
+  if(details.isConnected&&details.matches('details[data-coach-section]'))rememberSection(details.dataset.coachSection,details.open);
+},true);
 document.addEventListener('pointerdown',e=>{gradeTriggerWasOpen=!!e.target.closest('#piece-move-grade,#mobile-move-grade') && $('#piece-grade-popover').matches(':popover-open');},true);
 $('#piece-grade-popover').addEventListener('toggle',e=>{if(e.newState==='closed'){mobileGradeOpen=false;for(const b of document.querySelectorAll('[aria-controls="piece-grade-popover"]'))b.setAttribute('aria-expanded','false');}});
 window.addEventListener('scroll',()=>closeGradePopover(),{passive:true});
