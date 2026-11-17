@@ -83,3 +83,5 @@
 .review-story-move strong{font-size:19px}.review-story-grade{font-size:12px;color:#607652}.review-story-grade.grade-mistake,.review-story-grade.grade-blunder{color:#a44a3b}.review-story-grade.grade-medium{color:#9c761c}
 .review-story-words{display:block;font-size:12px;line-height:1.5;color:#64735e;margin-top:7px}
 #panel-content>.panel-intro{padding:0 0 12px}#panel-content>.panel-intro h2{font-size:22px;margin:0 0 7px}#panel-content>.panel-intro p{font-size:14px;margin:0}
+/* Coaching is one continuous panel; history appears in post-game review. */
+.panel-tabs{display:none!important}
