@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    try{const p=localStorage.getItem('between-moves-theme'),d=p==='dark'||(p!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';document.documentElement.style.colorScheme=d?'dark':'light';}catch{document.documentElement.dataset.theme=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+  </script>
+  <style>html{background:#f6f5f0}html[data-theme=dark]{background:#141c18}</style>
   <meta name="theme-color" content="#183c34" />
   <meta name="description" content="Your personal chess practice room. Play, understand every move, and build better habits. Free, private, and powered by Stockfish." />
   <title>Between Moves — Your chess practice room</title>

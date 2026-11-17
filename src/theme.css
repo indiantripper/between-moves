@@ -1,0 +1,42 @@
+/* Theme preference changes colours only; board geometry and piece colours stay intact. */
+:root{color-scheme:light;--page:#f6f5f0;--surface:#fffefa;--raised:#f0f4e9;--ink:#253b33;--soft-ink:#65735e;--edge:#dce4d3;--guide-bg:#173f34;--guide-ink:#fff9e9;--guide-muted:#e1e9d6;--guide-button:#e6c17f;--guide-button-ink:#23372e;--guide-scrim:#10291d55}
+:root[data-theme=dark]{color-scheme:dark;--page:#141c18;--surface:#1d2922;--raised:#26362b;--ink:#e4eddf;--soft-ink:#b0beaa;--edge:#405243;--green:#bad6bb;--muted:#a4b29c;--line:#35473a;--cream:#141c18;--accent:#dbbc80;--guide-bg:#f2ddae;--guide-ink:#20372b;--guide-muted:#40513b;--guide-button:#214d40;--guide-button-ink:#fff9eb;--guide-scrim:#020b076b}
+html,body{background:var(--page);color:var(--ink)}
+.appearance-control{display:inline-flex!important;align-items:center;gap:8px;margin:0!important;font-size:12px!important;color:var(--soft-ink)}
+.appearance-control select{width:auto;min-width:91px;min-height:36px;margin:0;padding:6px 9px;font-size:12px;background:var(--surface);color:var(--ink);border-color:var(--edge)}
+[data-theme=dark] :is(.side-panel,dialog,#replay-dialog,.piece-grade-popover,#mobile-quick-coach){background:var(--surface);color:var(--ink);border-color:var(--edge)}
+[data-theme=dark] :is(.feedback-card,.review-lesson,.next-move-option,.review-side-summaries>div,.review-score-head,.review-score-row>span,.coach-original-idea,.variation-card,.preview-bar,.quick-coach-panel,.coach-preview-card,.status-pill,.playback-coachmark,.badge-discovery,.promotion-choice){background:var(--raised);color:var(--ink);border-color:var(--edge)}
+[data-theme=dark] :is(.feedback-card.severity-1,.review-score-row button.grade-medium){background:#3a3421;color:#f2d58b;border-color:#6a5931}
+[data-theme=dark] :is(.feedback-card.severity-2,.feedback-card.severity-3,.review-score-row button.grade-mistake,.review-score-row button.grade-blunder){background:#3b2822;color:#f0c0a6;border-color:#6d4434}
+[data-theme=dark] :is(.best-move-lesson,.move-consequence,.next-move-option,.review-score-row button,.color-options span,.coaching-switch select,input[type=number],select,.button.secondary,.board-best-button,.board-resume-button,.side-to-play button){background:#233228;color:var(--ink);border-color:var(--edge)}
+[data-theme=dark] :is(.button.primary,.game-result-board strong){background:#365e49;color:#fff9ec;border-color:#bda16b}
+[data-theme=dark] .color-options input:checked+span,[data-theme=dark] .review-score-row button.is-selected,[data-theme=dark] .side-to-play button[aria-pressed=true]{background:#3c563e;color:#f1f5e6;border-color:#a1be8e}
+[data-theme=dark] :is(.feedback-card p,.feedback-card small,.feedback-top strong,.best-move-copy p,.piece-grade-facts p,.review-lesson-heading>strong,.next-move-title strong,.next-idea,.opponent-idea p,.opponent-idea-label,.coach-reply-summary,.move-in-words,.replay-impact,.replay-outcome,.quick-choice-name,.quick-status,.coach-question-answer,.quick-move-translation){color:inherit}
+[data-theme=dark] :is(.brand-tagline,.compact-brand-light,.practice-identity small,.player-bar small,#history-position,.board-note,.board-note span,.evaluation-caption span,.evaluation-caption button,.mobile-position small,.move-translation,.mini-caption,.mini-replay,.mini-enlarge,.next-move-title small,.next-move-title .next-rank,.next-moves-note,.next-moves-status,.opponent-plan-visual small,.eyebrow,.muted,dialog p,label small,.coaching-description,.review-analysis-status,.review-side-summaries small,.review-side-summaries span,.review-move-heading small,.review-breakdown-grid,.review-step-controls>span,#replay-body small,.replay-highlight-key,footer,footer button){color:var(--soft-ink)}
+[data-theme=dark] :is(.compact-brand,.compact-brand-knight,.practice-identity strong,.player-bar strong,.evaluation-caption>strong,.coach-toolbar h2,.review-side-summaries strong,.review-side-summaries b,.review-breakdown summary,.review-breakdown-grid strong,.review-breakdown-grid b,.best-move-preview-trigger,.next-options summary,.opponent-context summary,.button.subtle,.mini-replay,.mini-enlarge,.icon-button,.coach-question-tabs button){color:#c8ddba}
+[data-theme=dark] :is(.top-reset,.top-flip,.compact-brand-knight,.avatar,.you-avatar){background:#2a3a2d;border-color:var(--edge)}
+[data-theme=dark] :is(.practice-brand-bar,.timeline,.board-note,.opponent-context,.next-options,.review-breakdown,.review-score-sheet,.review-score-row,.review-side-summaries,.review-side-summaries>div+div,.review-score-row button,.best-move-lesson,.feedback-card,.mini-board,footer){border-color:var(--edge)}
+[data-theme=dark] #mobile-preview-coach:not(.review-mobile-lesson){background:var(--surface);color:var(--ink);border-color:var(--edge)}
+[data-theme=dark] .replay-watch{color:#f2b299}
+[data-theme=dark] .review-graph{background:linear-gradient(#384837 50%,#1b281e 50%);border-color:var(--edge)}
+[data-theme=dark] .review-graph polyline{stroke:#c0d89e}[data-theme=dark] .review-graph circle{fill:#c0d89e}[data-theme=dark] .review-graph .graph-mistake{fill:#edab87}[data-theme=dark] :is(.review-graph-white,.review-graph-black){color:#ced9be}
+[data-theme=dark] .review-lesson-heading :is(.grade-mistake,.grade-blunder){color:#f0ab96}[data-theme=dark] .review-lesson-heading .grade-medium{color:#efd071}
+[data-theme=dark] .review-lesson-heading>span{color:#c0d5ad}
+[data-theme=dark] .coach-question-tabs button[aria-pressed=true]{background:#3d573e;color:#fff9ec}
+[data-theme=dark] dialog::backdrop{background:#020b07b8}
+[data-theme=dark] .game-result-board span{background:#26372a;color:var(--ink)}
+/* Contrasting tour cards and a real spotlight make their target unambiguous. */
+#guide-spotlight{position:fixed;inset:0;width:100%;height:100%;z-index:59;pointer-events:none}
+#guide-spotlight[hidden]{display:none}
+.guide-card{background:var(--guide-bg);color:var(--guide-ink);border:1px solid #d4b379;border-radius:16px;box-shadow:0 16px 55px #0005;backdrop-filter:none}
+.guide-card .guide-label,.guide-card .guide-label button,.guide-card p{color:var(--guide-muted)}
+.guide-card h3{color:var(--guide-ink)}
+.guide-card .guide-actions button{background:var(--guide-button);color:var(--guide-button-ink)}
+.guide-card .guide-actions .guide-show{background:transparent;border:1px solid currentColor;color:var(--guide-ink)}
+.guide-card .guide-progress i{background:var(--guide-muted);opacity:.35}.guide-card .guide-progress i.active{background:var(--guide-button);opacity:1}
+.guide-target{outline:3px solid #e1b665!important;outline-offset:5px}
+[data-theme=dark] :is(#reset-board,#flip,.icon-button:hover){background:#2a3a2d;color:#d7e7c9;border-color:var(--edge)}
+[data-theme=dark] .move-token{background:#33442f;color:#f2db9e;border-color:#526446}
+[data-theme=dark] .move-consequence>strong{color:#f2c29e}
+[data-theme=dark] .feedback-symbol{color:#dfc784}
+[data-theme=dark] .feedback-card:is(.severity-2,.severity-3) .feedback-symbol{color:#f0ab96}

@@ -44,6 +44,8 @@ import './compact-coach.css';
 import { moveCaption, moveTranslation } from './move-caption.js';
 import { previewHighlights } from './coach-highlights.js';
 import { coachSuggestion, usedCoachHelp, previewSuggestion, previewLesson } from './ask-coach.js';
+import { installTheme } from './theme.js';
+import './theme.css';
 
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -88,7 +90,7 @@ $('#app').innerHTML = `
       <div class="board-note"><span id="opening-name">Opening practice</span><span id="book-status">Choose your opening</span></div>
     </section>
     <aside class="side-panel"><div class="panel-tabs"><button class="active" data-panel="coach">Coach</button><button class="mobile-top-five" data-show-five="true">Top 5</button></div><div id="panel-content"></div></aside></div>
-    <footer><span>Between Moves · Saved on this device</span><button id="about">About & privacy</button></footer>
+    <footer><span>Between Moves · Saved on this device</span><label class="appearance-control">Appearance<select id="appearance" aria-label="Appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label><button id="about">About & privacy</button></footer>
   </main>
 
 
@@ -103,7 +105,9 @@ $('#app').innerHTML = `
   <dialog id="promotion"><h2>Promote your pawn</h2><p>Choose your new piece.</p><div class="promotion-options"></div></dialog>
   <dialog id="replay-dialog" aria-labelledby="replay-title"><div class="dialog-top"><h2 id="replay-title">Move replay</h2><button class="icon-button" data-close="replay-dialog" aria-label="Close replay">×</button></div><div id="replay-body"></div></dialog>
   <dialog id="info"><div class="dialog-top"><span class="eyebrow">BETWEEN MOVES</span><button class="icon-button" data-close="info" aria-label="Close information">×</button></div><div id="info-body"></div></dialog>
-  <aside id="guide-card" class="guide-card" aria-label="Getting started" aria-live="polite" hidden></aside><div id="toast" role="status"></div>`;
+  <svg id="guide-spotlight" aria-hidden="true" hidden></svg><aside id="guide-card" class="guide-card" aria-label="Getting started" aria-live="polite" hidden></aside><div id="toast" role="status"></div>`;
+
+installTheme();
 
 function toast(message) { $('#toast').textContent = message; $('#toast').classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(()=>$('#toast').classList.remove('visible'),5500); }
 function handleError(error) { console.error(error); busy = false; render(); toast(error.message || 'Something went wrong. Please try again.'); }
@@ -663,7 +667,7 @@ function setup() {
   form.elements.color.value=settings.color;
   form.elements.opening.value=settings.opening;
 
-  $('#guide-card').hidden=true;$('#setup').showModal();
+  hideGuide();$('#setup').showModal();
 }
 async function startGame(event) {
   event.preventDefault();
@@ -995,6 +999,7 @@ document.addEventListener('pointercancel',e=>releaseDrag(e,true));
 window.addEventListener('blur',()=>{if(dragState)releaseDrag({pointerId:dragState.pointerId,clientX:0,clientY:0},true);});
 let guideStep=null,guideFrame;
 function scheduleGuide(){cancelAnimationFrame(guideFrame);guideFrame=requestAnimationFrame(paintGuide);}
+function hideGuide(){const card=$('#guide-card');if(card)card.hidden=true;const spotlight=$('#guide-spotlight');if(spotlight)spotlight.setAttribute('hidden','');}
 function guideTarget(){return guideStep?$(guideStep.target):null;}
 function completeGuide(){
   if(!guideStep)return;
@@ -1003,17 +1008,24 @@ function completeGuide(){
 function paintGuide(){
   const card=$('#guide-card');if(!state||!card)return;
   document.querySelectorAll('.guide-target').forEach(el=>el.classList.remove('guide-target'));
-  if($('dialog[open]')||positionEditor||preview?.line||!engineReady){card.hidden=true;return;}
+  if($('dialog[open]')||positionEditor||preview?.line||!engineReady){hideGuide();return;}
   const feedback=$('.best-move-lesson'),alternatives=$('[data-previous-options]'),opponent=$('.opponent-context'),next=$('[data-next-options]');
   guideStep=nextGuideStep({hasGame:!!current,hasGames:state.games.length>0,finished:current?.finished,ready:canAskCoach(),feedback:!current?.finished&&!!focus&&!!feedback,alternatives:!current?.finished&&!!focus&&!!alternatives,opponent:!current?.finished&&!!current?.attempts.length&&!!opponent,next:!current?.finished&&!!current?.attempts.length&&!!next&&humanTurn()&&!busy,bad:!!focus&&focus.grade?.severity>0&&!!$('.consequence-replay')},state.settings.guidedTour);
-  const target=guideTarget();if(!target||!target.getClientRects().length){card.hidden=true;return;}
+  const target=guideTarget();if(!target||!target.getClientRects().length){hideGuide();return;}
   target.classList.add('guide-target');card.hidden=false;
   const rect=target.getBoundingClientRect(),visible=rect.top>=0&&rect.top<innerHeight-80&&rect.bottom>0;
   const i=GUIDE_STEPS.findIndex(s=>s.id===guideStep.id);
   card.innerHTML=`<div class="guide-label"><span>${guideStep.id==='start'?'Welcome to betweenmoves':'A little guidance'}</span><button data-guide-skip aria-label="Skip getting started tips">×</button></div><h3>${esc(guideStep.title)}</h3><p>${esc(guideStep.text)}</p><div class="guide-actions"><span class="guide-progress" aria-hidden="true">${GUIDE_STEPS.map((s,n)=>`<i class="${n===i?'active':''}"></i>`).join('')}</span>${!visible?'<button class="guide-show" data-guide-show>Show me</button>':''}<button ${guideStep.id==='start'?'data-guide-start':'data-guide-next'}>${guideStep.action||'Got it →'}</button></div>`;
   const w=card.offsetWidth,h=card.offsetHeight,left=visible?Math.min(innerWidth-w-12,Math.max(12,rect.right-w)):Math.max(12,(innerWidth-w)/2);
-  const top=visible?(rect.bottom+h+20<innerHeight?rect.bottom+12:Math.max(12,rect.top-h-12)):Math.max(12,innerHeight-h-14);
+  const top=visible?(rect.bottom+h+36<innerHeight?rect.bottom+30:Math.max(12,rect.top-h-30)):Math.max(12,innerHeight-h-14);
   card.style.left=`${left}px`;card.style.top=`${top}px`;
+  const spotlight=$('#guide-spotlight');spotlight.toggleAttribute('hidden',!visible);
+  if(visible){
+    const x=Math.max(3,rect.left-6),y=Math.max(3,rect.top-6),right=Math.min(innerWidth-3,rect.right+6),bottom=Math.min(innerHeight-3,rect.bottom+6),cx=Math.max(x+8,Math.min(right-8,left+w/2));
+    const above=top+h<=rect.top,startY=above?top+h:top,endY=above?y:bottom;
+    spotlight.setAttribute('viewBox',`0 0 ${innerWidth} ${innerHeight}`);
+    spotlight.innerHTML=`<defs><mask id="guide-hole"><rect width="100%" height="100%" fill="white"/><rect x="${x}" y="${y}" width="${right-x}" height="${bottom-y}" rx="10" fill="black"/></mask><marker id="guide-pointer" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#e4bc73"/></marker></defs><rect width="100%" height="100%" fill="var(--guide-scrim)" mask="url(#guide-hole)"/><rect x="${x}" y="${y}" width="${right-x}" height="${bottom-y}" rx="10" fill="none" stroke="#e4bc73" stroke-width="2"/><path d="M${left+w/2} ${startY} L${cx} ${endY}" fill="none" stroke="#e4bc73" stroke-width="2.5" marker-end="url(#guide-pointer)"/>`;
+  }
 }
 let enlargedReplay=null,replayRequest=0;
 function paintEnlargedReplay(){
@@ -1030,7 +1042,7 @@ function stepEnlargedReplay(delta){if(enlargedReplay){enlargedReplay.step=Math.m
 async function openReplay(mini){
   stopMiniReplay();const token=++replayRequest;
   enlargedReplay=mini.dataset?{fen:mini.dataset.miniFen,pv:JSON.parse(mini.dataset.miniPv),flipped:mini.dataset.miniFlipped==='true',punishment:mini.dataset.miniPunishment==='true',limit:Number(mini.dataset.miniLimit),step:1}:{...mini,step:1};
-  const r=enlargedReplay;r.loading=r.punishment;$('#replay-title').textContent=r.punishment?'How this move can be punished':'Move replay';paintEnlargedReplay();$('#guide-card').hidden=true;$('#replay-dialog').showModal();
+  const r=enlargedReplay;r.loading=r.punishment;$('#replay-title').textContent=r.punishment?'How this move can be punished':'Move replay';paintEnlargedReplay();hideGuide();$('#replay-dialog').showModal();
   if(!r.punishment)return;
   try{r.pv=await extendReplayLine(r.fen,r.pv,fen=>engine.search(fen,{count:1,ms:650}),{limit:12,active:()=>token===replayRequest&&$('#replay-dialog').open});}catch{r.error=true;}
   if(token===replayRequest&&$('#replay-dialog').open){r.loading=false;paintEnlargedReplay();}
