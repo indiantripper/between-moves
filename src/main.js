@@ -45,6 +45,8 @@ import './compact-coach.css';
 import { moveCaption, moveTranslation } from './move-caption.js';
 import { previewHighlights } from './coach-highlights.js';
 import { coachSuggestion, usedCoachHelp, previewSuggestion, previewLesson } from './ask-coach.js';
+import { openingStory } from './opening-story.js';
+import './opening-story.css';
 import { installTheme } from './theme.js';
 import './theme.css';
 
@@ -57,7 +59,7 @@ let coachOn = true, awaiting = false, retrying = false, focus = null, preview = 
 let tab = 'coach', generation = 0, flipped = false, toastTimer, saveQueue = Promise.resolve();
 let dragState=null, suppressClickUntil=0;
 let mobileDestination='board',resultDismissedGameId=null;
-let renderedPanelKey=null;
+let renderedPanelKey=null,shownOpeningStory=null;
 let positionEditor=null, gradeTriggerWasOpen=false;
 let mobileGradeOpen=false, mobileGradeKey=null;
 let coachHelp=null, mobileCoachView='coach', mobilePreviewExpanded=false;
@@ -88,7 +90,7 @@ $('#app').innerHTML = `
 
 
       <div id="preview-bar" class="preview-bar" hidden></div>
-      <div class="board-note"><span id="opening-name">Opening practice</span><span id="book-status">Choose your opening</span></div>
+      <div class="board-note"><span id="opening-name">Opening practice</span><span id="book-status">Choose your opening</span><div id="opening-story" class="opening-story" hidden></div></div>
     </section>
     <aside class="side-panel"><div class="panel-tabs"><button class="active" data-panel="coach">Coach</button><button class="mobile-top-five" data-show-five="true">Top 5</button></div><div id="panel-content"></div></aside></div>
     <footer><span>Between Moves · Saved on this device</span><label class="appearance-control">Appearance<select id="appearance" aria-label="Appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label><button id="about">About & privacy</button></footer>
@@ -110,6 +112,17 @@ $('#app').innerHTML = `
 
 installTheme();
 
+function paintOpeningStory(opening){
+  const node=$('#opening-story');shownOpeningStory=positionEditor?null:openingStory(opening);node.hidden=!shownOpeningStory;
+  if(!shownOpeningStory){node.innerHTML='';return;}
+  const note=shownOpeningStory;node.innerHTML=`<p>${esc(note.idea)}</p><p class="opening-trivia"><b>Fun fact:</b> ${esc(note.trivia)}</p><button type="button" class="opening-learn-more" id="opening-learn-more" aria-label="Learn more about ${esc(note.name)}" aria-haspopup="dialog" aria-controls="info">Learn more</button>`;
+}
+function showOpeningStory(){
+  const note=shownOpeningStory;if(!note)return;hideGuide();
+  $('#info-body').innerHTML=`<article class="opening-story-detail"><span class="eyebrow">ABOUT THIS OPENING · ${esc(note.eco)}</span><h2>${esc(note.name)}</h2>${note.family!==note.name&&note.id!=='eco'?`<p class="opening-note-scope">A note on ${esc(note.family)}</p>`:''}<p>${esc(note.idea)} ${esc(note.detail)}</p><h3>Did you know?</h3><p>${esc(note.trivia)}</p><p class="opening-note-reference">Reference: Wikipedia · ${esc(note.sourceTitle)}</p></article>`;
+  $('#info').showModal();
+}
+$('#info').addEventListener('close',scheduleGuide);
 function toast(message) { $('#toast').textContent = message; $('#toast').classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(()=>$('#toast').classList.remove('visible'),5500); }
 function handleError(error) { console.error(error); busy = false; render(); toast(error.message || 'Something went wrong. Please try again.'); }
 function persist() {
@@ -468,6 +481,7 @@ function render() {
   const displayedGame=preview?.historyPly!=null ? positionAt(current,preview.historyPly) : game;
   const recognised=preview?.line ? openingAt(preview.fen) : identifyOpening(displayedGame);
   $('#opening-name').textContent = positionEditor?'Position editor':recognised ? `${recognised.eco} · ${recognised.name}` : 'Opening not yet identified';
+  paintOpeningStory(recognised);
   $('#book-status').textContent = current ? `Practice: ${getOpening()?.name || 'Custom position'} · ${bookStatus(getOpening(),displayedGame.history())}` : 'Start a new practice';
 
   $('#new-game').disabled = !engineReady || busy || !!positionEditor;
@@ -797,7 +811,7 @@ function stepPreview(delta) {
   if(!preview?.line)return; preview.step=Math.max(0,Math.min(preview.line.length,preview.step+delta));
   const g=new Chess(preview.base); for(const move of preview.line.slice(0,preview.step))g.move(uciMove(move));
   preview.fen=g.fen();if(preview.bestAlternative){arrow=null;render();return;} const next=preview.line[preview.step]; arrow=next?uciMove(next):null; drawBoard();
-  const opening=openingAt(preview.fen);$('#opening-name').textContent=opening?`${opening.eco} · ${opening.name}`:'Engine continuation';
+  const opening=openingAt(preview.fen);$('#opening-name').textContent=opening?`${opening.eco} · ${opening.name}`:'Engine continuation';paintOpeningStory(opening);
 }
 function returnToGame() {
   if(preview?.bestAlternative){const saved=preview.returnState;preview=saved.preview;coachHelp=saved.coachHelp;focus=saved.focus;tab=saved.tab;mobileCoachView=saved.mobileCoachView;mobilePreviewExpanded=saved.mobilePreviewExpanded;arrow=saved.arrow;selected=null;render();return;}
@@ -1135,7 +1149,7 @@ document.addEventListener('click',e=>{
   if(b.dataset.reviewRetry!=null){const a=reviewModel(current).entries.get(Number(b.dataset.reviewRetry));if(a){focus=a;retryMove();}return;}
   if(b.hasAttribute('data-review-analyse')){reviewAnalysisTask=null;reviewAnalysisError=null;render();return;}
   if(b.dataset.history!=null){viewHistory(Number(b.dataset.history));return;} if(b.dataset.game){$('#info').close();openRecord(b.dataset.game);return;}
-  const actions={ 'dismiss-playback-hint':dismissPlaybackHint,'resume-play':resumePlay,'editor-undo':undoPositionEdit,'editor-cancel':cancelPositionEditor,'piece-grade-close':()=>closeGradePopover(true),'piece-grade-retry':()=>{closeGradePopover();retryMove();},'piece-move-grade':toggleGradeExplanation,'mobile-move-grade':toggleGradeExplanation,'badge-help':toggleGradeExplanation,'desktop-grade-retry':retryMove,'mobile-grade-retry':retryMove,'mobile-best-move':showBestDirection,'quick-choice-back':()=>chooseQuickAlternative(-1),'quick-choice-next':()=>chooseQuickAlternative(1),'quick-close':()=>{coachHelp=null;arrow=null;render();},'quick-choice-preview':()=>previewCoachMove(1),'quick-choice-play':playCoachMove,'mobile-preview-back':()=>stepPreview(-1),'mobile-preview-next':()=>stepPreview(1),'mobile-preview-return':returnToGame,'mobile-preview-details':togglePreviewExplanation,'ask-coach':askCoach,'coach-show-move':()=>revealCoachMove(),'coach-preview-move':()=>previewCoachMove(1),'coach-preview-reply':()=>previewCoachMove(2),'coach-play-move':playCoachMove,'coach-dismiss':dismissCoachHelp,'coach-retry-help':()=>{coachHelp=null;askCoach();},'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
+  const actions={ 'opening-learn-more':showOpeningStory,'dismiss-playback-hint':dismissPlaybackHint,'resume-play':resumePlay,'editor-undo':undoPositionEdit,'editor-cancel':cancelPositionEditor,'piece-grade-close':()=>closeGradePopover(true),'piece-grade-retry':()=>{closeGradePopover();retryMove();},'piece-move-grade':toggleGradeExplanation,'mobile-move-grade':toggleGradeExplanation,'badge-help':toggleGradeExplanation,'desktop-grade-retry':retryMove,'mobile-grade-retry':retryMove,'mobile-best-move':showBestDirection,'quick-choice-back':()=>chooseQuickAlternative(-1),'quick-choice-next':()=>chooseQuickAlternative(1),'quick-close':()=>{coachHelp=null;arrow=null;render();},'quick-choice-preview':()=>previewCoachMove(1),'quick-choice-play':playCoachMove,'mobile-preview-back':()=>stepPreview(-1),'mobile-preview-next':()=>stepPreview(1),'mobile-preview-return':returnToGame,'mobile-preview-details':togglePreviewExplanation,'ask-coach':askCoach,'coach-show-move':()=>revealCoachMove(),'coach-preview-move':()=>previewCoachMove(1),'coach-preview-reply':()=>previewCoachMove(2),'coach-play-move':playCoachMove,'coach-dismiss':dismissCoachHelp,'coach-retry-help':()=>{coachHelp=null;askCoach();},'new-game':setup,'start-first':setup,'reset-board':resetBoard,flip:()=>{flipped=!flipped;drawBoard();},retry:retryMove,continue:continueGame,'resume-opponent':opponentTurn,
     'exit-preview':returnToGame,'cancel-opponent-edit':returnToGame,'explain-evaluation':explainEvaluation,'retry-evaluation':()=>{$('#info').close();positionAnalysis.retry(shownGame().fen());},'line-back':()=>stepPreview(-1),'line-next':()=>stepPreview(1),'history-start':()=>preview?.line?stepPreview(-preview.step):navigateHistory(0),'history-back':()=>stepHistory(-1),'history-next':()=>stepHistory(1),'history-live':returnToGame,'show-punishment':showPlayedLine,
     'board-review-game':()=>{resultDismissedGameId=current.id;navigateHistory(current.moves.length);$('#game-result-board').hidden=true;$('.side-panel').scrollIntoView({behavior:'smooth',block:'start'});},'review-moves':()=>{tab='moves';render();},'review-game':()=>{if(!current||busy)return;finishGame();tab='moves';persist();render();},about:()=>{
       $('#info-body').innerHTML='<h2>A practice room of your own.</h2><p>Between Moves runs chess analysis on your device using Stockfish 19 Lite. Coaching uses programmed rules and verified engine continuations, with no AI API.</p><p>Games, retries, and learning history are stored in this browser using IndexedDB. No accounts, analytics, or game uploads. Your host still handles ordinary website requests.</p><p>Games stay in this browser. Clearing browser data or changing browsers or devices won’t carry them over.</p><p>Opponent ratings are approximate targets. Positional explanations and practice book lines have limited coverage. Opening recognition uses the local Lichess opening-name database (CC0).</p><p>Stockfish.js is distributed under GPLv3. <a href="https://github.com/nmrugg/stockfish.js/tree/v19.0.1" target="_blank" rel="noreferrer">Engine source</a> · <a href="./engine/COPYING.txt" target="_blank">Engine licence</a>. Chess rules by chess.js (BSD-2-Clause).</p>';
