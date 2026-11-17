@@ -1,5 +1,3 @@
-.guide-target{outline:3px solid #c7a765!important;outline-offset:5px;border-radius:8px;box-shadow:0 0 0 9px #c7a76522;transition:box-shadow .2s}
-#new-game.guide-target{box-shadow:0 0 0 7px #c7a76526,0 0 0 13px #c7a76512}
 .guide-card{position:fixed;z-index:60;width:292px;max-width:calc(100vw - 24px);padding:16px 17px;border:1px solid #ffffff99;border-radius:18px;background:#fffefaf5;backdrop-filter:blur(14px);box-shadow:0 12px 42px #193c3426,0 2px 5px #193c3410;color:#253b33;text-align:left}
 .guide-card[hidden]{display:none}.guide-label{display:flex;align-items:center;justify-content:space-between;color:#7d704e;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
 .guide-label button{border:0;background:none;color:#7a8476;font-size:19px;min-width:28px;min-height:28px;padding:0;cursor:pointer}

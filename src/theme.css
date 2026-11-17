@@ -34,7 +34,6 @@ html,body{background:var(--page);color:var(--ink)}
 .guide-card .guide-actions button{background:var(--guide-button);color:var(--guide-button-ink)}
 .guide-card .guide-actions .guide-show{background:transparent;border:1px solid currentColor;color:var(--guide-ink)}
 .guide-card .guide-progress i{background:var(--guide-muted);opacity:.35}.guide-card .guide-progress i.active{background:var(--guide-button);opacity:1}
-.guide-target{outline:3px solid #e1b665!important;outline-offset:5px}
 [data-theme=dark] :is(#reset-board,#flip,.icon-button:hover){background:#2a3a2d;color:#d7e7c9;border-color:var(--edge)}
 [data-theme=dark] .move-token{background:#33442f;color:#f2db9e;border-color:#526446}
 [data-theme=dark] .move-consequence>strong{color:#f2c29e}

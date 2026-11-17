@@ -1045,7 +1045,6 @@ function paintGuide(){
   const progress=guideProgress(),seen=state.settings.guidedTour||{};
   if(seen.skipped){guideStep=null;guideShownAtDecision=null;hideGuide();return;}
   if(guideStep&&guideShownAtDecision!==progress.decisions){postponeGuide();return;}
-  document.querySelectorAll('.guide-target').forEach(el=>el.classList.remove('guide-target'));
   if($('dialog[open]')||$('#piece-grade-popover').matches(':popover-open')||positionEditor||preview?.line||!engineReady||busy||dragState?.active||document.hidden){hideGuide();return;}
   const feedback=$('.best-move-lesson'),alternatives=$('[data-previous-options]'),opponent=$('.opponent-context'),next=$('[data-next-options]');
   const context={hasGame:!!current,hasGames:state.games.length>0,finished:current?.finished,ready:!!current&&humanTurn()&&!busy,decisions:progress.decisions,now:progress.now,pageAgeMs:progress.now-guidePageOpenedAt,idleMs:progress.now-guideLastInputAt,badge:!!$('#piece-move-grade'),feedback:!!focus&&!!feedback,alternatives:!!focus&&!!alternatives,opponent:!!current?.attempts.length&&!!opponent,next:!!next,bad:!!focus&&focus.grade?.severity>0&&!!$('.consequence-replay'),opportunity:!!focus&&!!$('.missed-opportunity-lesson')};
@@ -1056,7 +1055,7 @@ function paintGuide(){
   }
   const target=guideTarget();if(!target||!target.getClientRects().length){hideGuide();return;}
   if(guideShownAtDecision==null)guideShownAtDecision=progress.decisions;
-  target.classList.add('guide-target');card.hidden=false;
+  card.hidden=false;
   const rect=target.getBoundingClientRect(),visible=rect.top>=0&&rect.top<innerHeight-80&&rect.bottom>0;
   const contentKey=`${guideStep.id}|${guideStep.title}|${visible}`;
   if(card.dataset.guideContent!==contentKey){
@@ -1072,7 +1071,11 @@ function paintGuide(){
     if(spotlightAnimationId!==guideStep.id){spotlight.classList.remove('guide-spotlight-enter');void spotlight.getBoundingClientRect();spotlight.classList.add('guide-spotlight-enter');spotlightAnimationId=guideStep.id;}
     const x=Math.max(3,rect.left-6),y=Math.max(3,rect.top-6),right=Math.min(innerWidth-3,rect.right+6),bottom=Math.min(innerHeight-3,rect.bottom+6),cx=Math.max(x+8,Math.min(right-8,left+w/2));
     const above=top+h<=rect.top,startY=above?top+h:top,endY=above?y:bottom;
-    spotlight.setAttribute('viewBox',`0 0 ${innerWidth} ${innerHeight}`);
+    // Match the SVG's actual viewport (which can exclude the page scrollbar).
+    // The spotlight owns the only target outline; no CSS ring is layered beneath it.
+    const viewport=spotlight.getBoundingClientRect();
+    spotlight.setAttribute('viewBox',`0 0 ${viewport.width} ${viewport.height}`);
+    spotlight.setAttribute('preserveAspectRatio','none');
     spotlight.innerHTML=`<defs><mask id="guide-hole"><rect width="100%" height="100%" fill="white"/><rect x="${x}" y="${y}" width="${right-x}" height="${bottom-y}" rx="10" fill="black"/></mask><marker id="guide-pointer" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#e4bc73"/></marker></defs><rect width="100%" height="100%" fill="var(--guide-scrim)" mask="url(#guide-hole)"/><rect x="${x}" y="${y}" width="${right-x}" height="${bottom-y}" rx="10" fill="none" stroke="#e4bc73" stroke-width="2"/><path d="M${left+w/2} ${startY} L${cx} ${endY}" fill="none" stroke="#e4bc73" stroke-width="2.5" marker-end="url(#guide-pointer)"/>`;
   }
 }
