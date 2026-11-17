@@ -94,3 +94,9 @@
 .consequence-replay span{font-size:13px;line-height:1.5;display:block}
 .opponent-plan-visual p{font-size:14px!important;margin:0!important;line-height:1.6}
 @media(max-width:360px){.opponent-plan-visual,.consequence-replay{grid-template-columns:minmax(0,1fr) 88px}.opponent-plan-visual .mini-line-preview,.consequence-replay .mini-line-preview{width:88px}}
+.badge-discovery{display:none}
+@media(max-width:900px){
+  main{padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+  .badge-discovery:not([hidden]){display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:6px 0 0;padding:5px 8px;min-height:36px;border:1px solid #dce5d3;border-radius:8px;background:#eef3e8;color:#3a5945;font:inherit;font-size:12px;line-height:1.4;text-align:left;cursor:pointer}
+  .badge-discovery .grade-disc{width:23px;height:23px;font-size:12px;border-width:1px;box-shadow:none}
+}
