@@ -1,3 +1,4 @@
+import { moveInWords } from './move-language.js';
 import { Chess } from 'chess.js';
 import { explainOpponentMove } from './opponent-coach.js';
 import { PIECE_NAMES, uciMove, explainCandidate, sanLine } from './coach.js';
@@ -20,7 +21,7 @@ export function coachSuggestion(fen,line,level=1350) {
   const hint=before.isCheck()?'Your king is in check. Look for a legal way to escape, block the check or capture the checking piece.':after.isCheckmate()?'Look for a checking move that leaves the king no escape.':move.captured?`Look for a capture of an opponent’s ${PIECE_NAMES[move.captured]}. Check how they can reply.`:move.flags.includes('k')||move.flags.includes('q')?'Can you improve your king’s position and activate a rook in one move?':targets.length?`Can you activate a ${PIECE_NAMES[move.piece]} while putting pressure on an opponent’s piece or pawn?`:controlled.length?'Look for a move that improves your control of the centre.':'Look for a piece whose activity you can improve, and check the opponent’s forcing replies.';
   const continuation=new Chess(fen),pv=[];
   for(const uci of line.pv.slice(0,8)){try{pv.push(continuation.move(uciMove(uci)).lan);}catch{break;}}
-  return {pv,fen,uci:move.lan,san:move.san,from:move.from,to:move.to,piece:PIECE_NAMES[move.piece],hint,idea,line:sanLine(fen,line.pv,8)};
+  return {words:moveInWords(move),pv,fen,uci:move.lan,san:move.san,from:move.from,to:move.to,piece:PIECE_NAMES[move.piece],hint,idea,line:sanLine(fen,line.pv,8)};
 }
 export function usedCoachHelp(record,fen,ply) { return (record?.hints||[]).some(h=>h.fen===fen && h.ply===ply); }
 
@@ -60,5 +61,5 @@ export function previewLesson(suggestion,step,level=1350) {
   else if(after.isDraw())watch=after.isStalemate()?'This position is stalemate, so the line ends in a draw.':'This preview position is drawn; there is no move to continue here.';
   else if(after.isCheck())watch=own?'Your move gives check. The opponent must answer it before carrying out another plan.':'Your king is in check. Your next move must capture the checker, block the check or move the king legally.';
   if(!watch)watch=own?'Check the opponent’s forcing replies—checks, captures and direct threats—before assuming your idea will work.':'Look for your own checks and captures, and check which pieces the reply attacks before choosing your response.';
-  return {step:count,total:suggestion.pv.length,actor:own?'you':'opponent',heading:`${own?'Your move':'Opponent’s reply'} · ${side} ${move.san}`,reason,plan:own?'Compare the next reply to see how this idea holds up.':opponent.plan,watch,next};
+  return {words:moveInWords(move),step:count,total:suggestion.pv.length,actor:own?'you':'opponent',heading:`${own?'Your move':'Opponent’s reply'} · ${side} ${move.san}`,reason,plan:own?'Compare the next reply to see how this idea holds up.':opponent.plan,watch,next};
 }

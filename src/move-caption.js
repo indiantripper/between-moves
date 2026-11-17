@@ -1,3 +1,4 @@
+import { moveInWords } from './move-language.js';
 import { Chess } from 'chess.js';
 import { positionAt } from './timeline.js';
 import { uciMove } from './coach.js';
@@ -17,4 +18,14 @@ export function moveCaption(record,view=null) {
   }
   const shown=positionAt(record,view?.historyPly ?? record.moves.length),history=shown.history({verbose:true});
   return history.length?history.slice(-2).map(label).join('  ·  '):`Starting position · ${shown.turn()==='w'?'White':'Black'} to move`;
+}
+
+export function moveTranslation(record,view=null) {
+  if(!record||view?.opponentEdit)return '';
+  try{
+    const shown=view?.line?new Chess(view.base):positionAt(record,view?.historyPly??record.moves.length);
+    if(view?.line)for(const uci of view.line.slice(0,view.step))shown.move(uciMove(uci));
+    const last=shown.history({verbose:true}).at(-1);
+    return last?`${last.color==='w'?'White':'Black'}: ${moveInWords(last)}`:'';
+  }catch{return '';}
 }
