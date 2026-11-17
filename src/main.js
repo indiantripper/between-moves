@@ -11,6 +11,7 @@ import './interaction.css';
 import './readability.css';
 import { COACHING_MODES, coachingIntensity as savedIntensity, feedbackPolicy } from './coaching-intensity.js';
 import { COACH_QUESTIONS, coachQuestion } from './coach-questions.js';
+import { resetPractice } from './reset-practice.js';
 import { bestMovePreview } from './best-move-preview.js';
 import { compareMove } from './move-comparison.js';
 import './whatif.css';
@@ -81,7 +82,7 @@ $('#app').innerHTML = `
 
     <div class="field-label" id="setup-side-label">Play as</div><div class="color-options"><label><input type="radio" name="color" value="w" checked/><span>♔ <strong>White</strong><small>You make the first move</small></span></label><label><input type="radio" name="color" value="b"/><span>♚ <strong>Black</strong><small>Practise your response</small></span></label></div>
     <label>Opening<select name="opening">${OPENINGS.map(o=>`<option value="${o.id}">${o.name}</option>`).join('')}</select><small>Curated book variations. You can leave the book at any time.</small></label>
-    <label>Coaching intensity<select name="coachingIntensity">${COACHING_MODES.map(m=>`<option value="${m.id}" ${m.id==='honest'?'selected':''}>${m.label} — ${m.description}</option>`).join('')}</select><small>Change this anytime. Coaching strength stays the same.</small></label>
+    <label>Coaching intensity<select name="coachingIntensity">${COACHING_MODES.map(m=>`<option value="${m.id}" ${m.id==='honest'?'selected':''}>${m.label}</option>`).join('')}</select><small id="setup-coaching-description" aria-live="polite">${COACHING_MODES.find(m=>m.id==='honest').description}</small></label>
     <button class="button primary wide" type="submit">Let’s play <span>↗</span></button><p class="privacy-note">No account. No subscription. Your history stays in this browser.</p></form></dialog>
   <section id="piece-grade-popover" class="piece-grade-popover" popover="auto" role="dialog" aria-labelledby="piece-grade-title"></section>
   <dialog id="promotion"><h2>Promote your pawn</h2><p>Choose your new piece.</p><div class="promotion-options"></div></dialog>
@@ -421,7 +422,7 @@ function render() {
   $('#book-status').textContent = current ? `Practice: ${getOpening()?.name || 'Custom position'} · ${bookStatus(getOpening(),displayedGame.history())}` : 'Start a new practice';
   $('#review-game').disabled = !current || busy || !!positionEditor || current.finished;
   $('#new-game').disabled = !engineReady || busy || !!positionEditor;
-  $('#reset-board').disabled = !engineReady || busy || !current || !!positionEditor;
+  $('#reset-board').disabled = !engineReady || busy || !current;
   document.querySelectorAll('[data-panel]').forEach(b=>b.classList.toggle('active',b.dataset.panel===tab));
   document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab==='coach'));
   if(matchMedia('(max-width:900px)').matches){
@@ -496,9 +497,14 @@ function updateSetupMode() {
   notes[1].textContent=free?'Black at the bottom':'Practise your response';
 }
 $('#setup-form').elements.mode.addEventListener('change',updateSetupMode);
+function updateSetupCoachingDescription() {
+  const mode=COACHING_MODES.find(m=>m.id===$('#setup-form').elements.coachingIntensity.value);
+  $('#setup-coaching-description').textContent=mode.description;
+}
 function setup() {
   const form=$('#setup-form'), settings=state.settings;
   form.elements.coachingIntensity.value=savedIntensity(settings);
+  updateSetupCoachingDescription();
   form.elements.mode.value=settings.mode==='free'?'free':'opponent';
   updateSetupMode();
   form.elements.opponent.value=settings.opponent;
@@ -522,11 +528,12 @@ async function startGame(event) {
 }
 async function resetBoard() {
   if(busy || !engineReady || !current)return;
-  const {color,opening,level,opponent,mode,startFen}=current;
+  const {color}=current;
+  const opening=getOpening()?.id||chooseOpening(state.settings.opening).id;
   if(!current.finished){current.finished=true;current.result='Board reset · previous practice saved';}
-  current={id:crypto.randomUUID(),created:new Date().toISOString(),color,opening,level,opponent,mode,assess:false,coachingIntensity:intensity,coach:coachOn,...(startFen?{startFen}:{}),moves:[],attempts:[],finished:false};
-  state.games.push(current);state.active=current.id;game=new Chess(startFen);flipped=color==='b';
-  generation++;awaiting=false;retrying=false;focus=null;preview=null;arrow=null;selected=null;tab='coach';
+  current=resetPractice(current,crypto.randomUUID(),{opening,coachingIntensity:intensity,coach:coachOn});
+  state.games.push(current);state.active=current.id;game=new Chess();flipped=color==='b';
+  generation++;positionEditor=null;coachHelp=null;dragState=null;$('#drag-piece')?.remove();awaiting=false;retrying=false;focus=null;preview=null;arrow=null;selected=null;mobileCoachView='coach';mobilePreviewExpanded=false;tab='coach';
   await persist();render();toast('Board reset. Ready for a fresh start.');
   if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
   if(color==='b')opponentTurn();
@@ -812,7 +819,7 @@ document.addEventListener('pointercancel',e=>releaseDrag(e,true));
 window.addEventListener('blur',()=>{if(dragState)releaseDrag({pointerId:dragState.pointerId,clientX:0,clientY:0},true);});
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b || b.disabled)return;
-  if(positionEditor && !['editor-resume','editor-undo','editor-cancel','flip'].includes(b.id)){toast('Resume or cancel your position edits first.');return;}
+  if(positionEditor && !['editor-resume','editor-undo','editor-cancel','flip','reset-board'].includes(b.id)){toast('Resume or cancel your position edits first.');return;}
   if(b.hasAttribute('data-best-return')){returnToGame();return;}
   if(b.dataset.bestStep){stepPreview(Number(b.dataset.bestStep));return;}
   if(b.dataset.bestPly!=null){previewBestMove(Number(b.dataset.bestPly),b.dataset.bestUci);return;}
@@ -839,6 +846,7 @@ document.addEventListener('click',e=>{
   }; actions[b.id.replace(/^desktop-quick-/,'quick-')]?.();
 });
 document.addEventListener('change',e=>{
+  if(e.target.name==='coachingIntensity')updateSetupCoachingDescription();
   if(e.target.id==='editor-turn' && positionEditor){positionEditor.turn=e.target.value;$('#editor-resume').textContent=`Resume · ${e.target.value==='w'?'White':'Black'} to play`;}
   if(e.target.id==='coaching-intensity'){
     intensity=e.target.value;coachOn=intensity!=='silent';
