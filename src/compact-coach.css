@@ -100,3 +100,9 @@
   .badge-discovery:not([hidden]){display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin:6px 0 0;padding:5px 8px;min-height:36px;border:1px solid #dce5d3;border-radius:8px;background:#eef3e8;color:#3a5945;font:inherit;font-size:12px;line-height:1.4;text-align:left;cursor:pointer}
   .badge-discovery .grade-disc{width:23px;height:23px;font-size:12px;border-width:1px;box-shadow:none}
 }
+/* Resume stays beside the coach icon, never over the board. */
+.board-resume-button:not([hidden]){display:inline-flex;align-items:center;justify-content:center;position:static;flex-shrink:0;width:40px;height:40px;min-width:40px;padding:0;border:1px solid #d8e3cf;border-radius:10px;background:#eaf2e2;color:#28533c;font-size:18px;cursor:pointer}
+.board-resume-button:disabled{opacity:.4;cursor:default}
+@media(max-width:900px){.board-resume-button:not([hidden]){width:36px;min-width:36px;height:40px;font-size:16px}}
+@media(max-width:360px){.timeline:has(.board-resume-button:not([hidden])){gap:3px}.timeline:has(.board-resume-button:not([hidden])) .timeline-buttons .icon-button{width:27px;min-width:27px}.timeline:has(.board-resume-button:not([hidden])) .board-best-button,.board-resume-button:not([hidden]){width:30px;min-width:30px}.timeline:has(.board-resume-button:not([hidden])) .coaching-switch select{width:83px}}
+@media(max-width:360px){.timeline:has(.board-resume-button:not([hidden])) .coaching-switch select{font-size:12px;padding-left:6px;padding-right:20px}}
