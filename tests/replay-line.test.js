@@ -23,3 +23,14 @@ test('preview arrows use the preview cursor even at the end of the actual game',
  assert.equal(navigationCursor(40,{line:['e2e4','e7e5'],step:2}).next,false);
  assert.equal(navigationCursor(40,{historyPly:10}).next,true);assert.equal(navigationCursor(40,null).next,false);
 });
+
+test('a truncated mating PV is filled through the defence to actual checkmate',async()=>{
+ const fen='7k/8/5K2/4Q3/8/8/8/8 w - - 0 1',saved=['e5c7'];let searches=0;
+ const full=await extendReplayLine(fen,saved,async position=>{
+   searches++;const board=new Chess(position);assert.equal(board.turn(),'b');
+   return {lines:[{mate:-1,pv:['h8g8','c7g7']}]};
+ });
+ assert.equal(searches,1);assert.deepEqual(full,['e5c7','h8g8','c7g7']);
+ assert.equal(new Chess(miniLineFrames(fen,full,12).at(-1).fen).isCheckmate(),true);
+ assert.deepEqual(saved,['e5c7']);
+});

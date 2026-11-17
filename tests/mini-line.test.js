@@ -22,3 +22,11 @@ test('opponent plan thumbnails can start on the follow-up and include direction 
   const markup=miniLineMarkup(g.fen(),['g1f3','b8c6'],false,{initial:2,arrows:true});
   assert.match(markup,/data-mini-index="2"/);assert.match(markup,/mini-caption">Nc6/);assert.match(markup,/<polygon/);
 });
+
+test('missed-mate thumbnails show the full verified sequence and identify incomplete lines',()=>{
+ const fen='7k/8/5K2/4Q3/8/8/8/8 w - - 0 1';
+ const complete=miniLineMarkup(fen,['e5c7','h8g8','c7g7'],false,{mode:'missed-mate',limit:12});
+ assert.match(complete,/Mate: Qc7 → Kg8 → Qg7#/);assert.match(complete,/Replay the checkmate line/);
+ const short=miniLineMarkup(fen,['e5c7'],false,{mode:'missed-mate',limit:12});
+ assert.match(short,/Finding the checkmate line/);assert.doesNotMatch(short,/Mate: /);
+});

@@ -131,3 +131,5 @@
 .side-to-play button{border:0;background:transparent;color:#65745f;font:inherit;font-size:13px;min-height:32px;padding:5px 12px;border-radius:6px;cursor:pointer}
 .side-to-play button[aria-pressed="true"]{background:#27523f;color:#fffaf0}
 .position-editor-error:not([hidden]){font-size:13px;line-height:1.5;color:#a34a36;background:#fff3ed;padding:8px 10px;margin:0 0 9px;border-radius:7px}
+
+.mini-mating-line{font-size:11px!important;line-height:1.5!important;margin:5px 0 0!important;overflow-wrap:anywhere;color:var(--soft-ink,#61705e)}

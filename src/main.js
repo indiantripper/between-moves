@@ -548,6 +548,7 @@ function previousMoveOptionsMarkup(attempt) {
   }).join('')}</div>${alternatives.length?'<small class="next-moves-note">Replay an alternative and a possible reply. Your game stays unchanged.</small>':'<p class="next-moves-status">No other analysed moves are available for this turn.</p>'}</details>`;
 }
 function renderCoach(active) {
+  queueMicrotask(hydrateMatingThumbnails);
   scheduleGuide();
   if(current?.finished&&!preview?.line&&!positionEditor){renderGameReview();return;}
   if(current?.finished || preview?.bestAlternative){renderLegacyCoach(active);return;}
@@ -1087,7 +1088,8 @@ function paintEnlargedReplay(){
   const board=new Chess(frame.fen),pieceValue={p:1,n:3,b:3,r:5,q:9,k:0};
   const balance=board.board().flat().filter(Boolean).reduce((n,p)=>n+(p.color==='w'?1:-1)*pieceValue[p.type],0);
   const lesson=replayLesson(r.fen,r.pv,index,{punishment:r.punishment,mode:r.mode});
-  $('#replay-body').innerHTML=`${miniLineMarkup(r.fen,r.pv,r.flipped,{initial:Math.max(1,index),limit:r.limit,arrows:true,highlights:lesson})}<div class="replay-highlight-key"><span>Move / idea</span><span>Threat</span>${lesson?.marks.some(m=>m.role==='pin')?'<span>Pin</span>':''}</div><section class="replay-coach-lesson" aria-live="polite"><h3>${esc(lesson?.heading||frame.label)}</h3><p>${esc(lesson?.reason||frame.words)}</p>${lesson?.watch?`<p class="replay-watch">${esc(lesson.watch)}</p>`:''}${lesson?.impact?`<p class="replay-impact">${esc(lesson.impact)}</p>`:''}</section><div class="replay-step-controls"><button class="button secondary" data-replay-step="-1" aria-label="Previous replay move" ${index===0?'disabled':''}>←</button><span>${index} / ${frames.length-1}</span><button class="button secondary" data-replay-step="1" aria-label="Next replay move" ${index===frames.length-1?'disabled':''}>→</button></div><p class="replay-outcome">${board.isCheckmate()?`Checkmate · ${board.turn()==='w'?'Black':'White'} wins`:board.isDraw()?'Draw':board.isCheck()?'Check · the king must respond':balance===0?'Material is level':`${balance>0?'White':'Black'} has ${Math.abs(balance)} more points of material`}</p><small>${r.loading?(r.mode==='missed-mate'?'Finding the mating continuation…':'Finding a longer continuation…'):r.error?'Couldn’t extend the line. You can still replay the saved moves.':r.mode==='missed-mate'?'The mate you could have played, against the best defence.':r.mode==='missed-opportunity'?'Your better line, against the best defence.':r.punishment?'Best play for both sides · up to six moves each, or until the game ends.':'One possible continuation.'} Your game stays unchanged.</small>`;
+  $('#replay-body').innerHTML=`${miniLineMarkup(r.fen,r.pv,r.flipped,{initial:Math.max(1,index),limit:r.limit,mode:r.mode,arrows:true,highlights:lesson})}<div class="replay-highlight-key"><span>Move / idea</span><span>Threat</span>${lesson?.marks.some(m=>m.role==='pin')?'<span>Pin</span>':''}</div><section class="replay-coach-lesson" aria-live="polite"><h3>${esc(lesson?.heading||frame.label)}</h3><p>${esc(lesson?.reason||frame.words)}</p>${lesson?.watch?`<p class="replay-watch">${esc(lesson.watch)}</p>`:''}${lesson?.impact?`<p class="replay-impact">${esc(lesson.impact)}</p>`:''}</section><div class="replay-step-controls"><button class="button secondary" data-replay-step="-1" aria-label="Previous replay move" ${index===0?'disabled':''}>←</button><span>${index} / ${frames.length-1}</span><button class="button secondary" data-replay-step="1" aria-label="Next replay move" ${index===frames.length-1?'disabled':''}>→</button></div><p class="replay-outcome">${board.isCheckmate()?`Checkmate · ${board.turn()==='w'?'Black':'White'} wins`:board.isDraw()?'Draw':board.isCheck()?'Check · the king must respond':balance===0?'Material is level':`${balance>0?'White':'Black'} has ${Math.abs(balance)} more points of material`}</p><small>${r.loading?(r.mode==='missed-mate'?'Finding the mating continuation…':'Finding a longer continuation…'):r.error?(r.mode==='missed-mate'?'The full mate could not be confirmed yet. Close and reopen to try again.':'Couldn’t extend the line. You can still replay the saved moves.'):r.mode==='missed-mate'?'The mate you could have played, against the best defence.':r.mode==='missed-opportunity'?'Your better line, against the best defence.':r.punishment?'Best play for both sides · up to six moves each, or until the game ends.':'One possible continuation.'} Your game stays unchanged.</small>`;
+  if(r.error&&r.mode==='missed-mate')$('#replay-body .mini-mating-line').textContent='Full mate not confirmed yet.';
   const mini=$('#replay-body .mini-line-preview');mini.querySelectorAll('[data-mini-frame]').forEach((f,i)=>f.classList.toggle('is-current',i===index));mini.querySelector('.mini-caption').textContent=frame.label;
 }
 function stepEnlargedReplay(delta){if(enlargedReplay){enlargedReplay.step=Math.max(0,enlargedReplay.step+delta);paintEnlargedReplay();}}
@@ -1096,15 +1098,48 @@ async function openReplay(mini){
   enlargedReplay=mini.dataset?{fen:mini.dataset.miniFen,pv:JSON.parse(mini.dataset.miniPv),flipped:mini.dataset.miniFlipped==='true',punishment:mini.dataset.miniPunishment==='true',mode:mini.dataset.miniMode,limit:Number(mini.dataset.miniLimit),step:1}:{...mini,step:1};
   const r=enlargedReplay;r.loading=r.punishment||r.mode?.startsWith('missed-');$('#replay-title').textContent=r.mode==='missed-mate'?'The mate you missed':r.mode==='missed-opportunity'?'The opportunity you missed':r.punishment?'How this move can be punished':'Move replay';paintEnlargedReplay();hideGuide();$('#replay-dialog').showModal();
   if(!r.loading)return;
-  try{r.pv=await extendReplayLine(r.fen,r.pv,fen=>engine.search(fen,{count:1,ms:650}),{limit:r.limit,active:()=>token===replayRequest&&$('#replay-dialog').open});}catch{r.error=true;}
+  try{r.pv=r.mode==='missed-mate'?await completeMatingLine(r.fen,r.pv,r.limit):await extendReplayLine(r.fen,r.pv,fen=>engine.search(fen,{count:1,ms:650}),{limit:r.limit,active:()=>token===replayRequest&&$('#replay-dialog').open});if(r.mode==='missed-mate'&&!replayEndsInMate(r.fen,r.pv,r.limit))r.error=true;}catch{r.error=true;}
   if(token===replayRequest&&$('#replay-dialog').open){r.loading=false;paintEnlargedReplay();}
 }
 $('#replay-dialog').addEventListener('close',()=>{replayRequest++;enlargedReplay=null;stopMiniReplay();scheduleGuide();});
 $('#replay-dialog').addEventListener('click',e=>{if(e.target===$('#replay-dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
+// Saved MultiPV lines can end at a transposition before the actual mate.
+// Complete them once, sharing the result between inline and enlarged replays.
+const matingLines=new Map();
+function replayEndsInMate(fen,pv,limit){const frames=miniLineFrames(fen,pv,limit);return !!frames.length&&new Chess(frames.at(-1).fen).isCheckmate();}
+function completeMatingLine(fen,pv,limit){
+  const key=JSON.stringify([fen,pv,limit]);
+  if(!matingLines.has(key)){
+    if(matingLines.size>=40)matingLines.delete(matingLines.keys().next().value);
+    const task=extendReplayLine(fen,pv,position=>engine.search(position,{count:1,ms:900}),{limit});
+    matingLines.set(key,task);
+    task.then(line=>{if(!replayEndsInMate(fen,line,limit))matingLines.delete(key);},()=>matingLines.delete(key));
+  }
+  return matingLines.get(key);
+}
+async function hydrateMatingThumbnails(){
+  for(const mini of document.querySelectorAll('.best-move-lesson [data-mini-mode="missed-mate"]')){
+    if(mini.dataset.mateLoading==='true'||mini.dataset.mateReady==='true')continue;
+    const fen=mini.dataset.miniFen,pv=JSON.parse(mini.dataset.miniPv),limit=Number(mini.dataset.miniLimit);
+    if(replayEndsInMate(fen,pv,limit)){mini.dataset.mateReady='true';continue;}
+    mini.dataset.mateLoading='true';const button=mini.querySelector('[data-mini-replay]');button.disabled=true;button.textContent='Finding mate…';
+    try{
+      const line=await completeMatingLine(fen,pv,limit);if(!mini.isConnected)continue;
+      const holder=document.createElement('template');holder.innerHTML=miniLineMarkup(fen,line,mini.dataset.miniFlipped==='true',{limit,mode:'missed-mate',arrows:true});
+      const updated=holder.content.firstElementChild;
+      mini.innerHTML=updated.innerHTML;mini.dataset.miniPv=JSON.stringify(line);mini.dataset.miniCount=updated.dataset.miniCount;mini.dataset.miniIndex=updated.dataset.miniIndex;
+      mini.dataset.mateReady=String(replayEndsInMate(fen,line,limit));
+      if(mini.dataset.mateReady!=='true')mini.querySelector('.mini-mating-line').textContent='Full mate not confirmed. Tap Replay to try again.';
+    }catch{if(mini.isConnected){mini.querySelector('.mini-mating-line').textContent='Couldn’t load the mate. Tap Replay to retry.';button.disabled=false;button.textContent='↻ Retry';}}
+    finally{mini.dataset.mateLoading='false';}
+  }
+}
 let miniReplayTimer;
 function stopMiniReplay(){clearInterval(miniReplayTimer);miniReplayTimer=null;for(const mini of document.querySelectorAll('.mini-line-preview')){const btn=mini.querySelector('[data-mini-replay]');btn.setAttribute('aria-pressed','false');btn.textContent='▶ Replay';}}
 function replayMini(button){
-  const mini=button.closest('.mini-line-preview'),wasPlaying=button.getAttribute('aria-pressed')==='true';stopMiniReplay();if(wasPlaying)return;
+  const mini=button.closest('.mini-line-preview');
+  if(mini.dataset.miniMode==='missed-mate'&&mini.dataset.mateReady!=='true'&&!replayEndsInMate(mini.dataset.miniFen,JSON.parse(mini.dataset.miniPv),Number(mini.dataset.miniLimit))){hydrateMatingThumbnails();return;}
+  const wasPlaying=button.getAttribute('aria-pressed')==='true';stopMiniReplay();if(wasPlaying)return;
   const frames=[...mini.querySelectorAll('[data-mini-frame]')],labels=[...mini.querySelectorAll('.mini-frame-labels span')];let index=0;
   const paint=()=>{frames.forEach((frame,i)=>frame.classList.toggle('is-current',i===index));mini.dataset.miniIndex=index;mini.querySelector('.mini-caption').textContent=labels[index].textContent;};
   paint();button.setAttribute('aria-pressed','true');button.textContent='Ⅱ Pause';
