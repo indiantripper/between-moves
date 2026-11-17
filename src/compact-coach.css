@@ -43,3 +43,43 @@
   .coach-empty p{font-size:14px}
 }
 @media(max-width:360px){.best-move-lesson{grid-template-columns:minmax(0,1fr) 88px}.mini-line-preview{width:88px}.mini-replay{font-size:10px}.mini-caption{font-size:10px}}
+/* Current-position options replace the old ask-first workflow. */
+#mobile-ask-coach{display:none!important}
+.next-moves-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px}
+.next-moves-heading strong{font-size:18px}.next-moves-heading span{font-size:12px;color:#65745f}
+.next-move-options{display:grid;gap:8px}
+.next-move-option{border:1px solid #e1e6d9;border-radius:10px;background:#fafbf6;overflow:hidden}
+.next-move-option:first-child{background:#eff4e9;border-color:#cddcc3}
+.next-move-option>summary{display:flex;align-items:start;gap:10px;padding:12px;cursor:pointer;list-style:none}
+.next-move-option>summary::-webkit-details-marker{display:none}
+.next-rank{font-size:12px;color:#6c7d64;padding-top:5px;min-width:12px}
+.next-move-copy{flex:1;min-width:0}.next-move-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.next-move-title strong{font-size:21px}.next-move-title small{font-size:11px;color:#59734d}
+.next-idea{display:block;font-size:14px;line-height:1.5;margin-top:4px;color:#405a48}
+.next-expand{font-size:18px;color:#60745b}.next-move-option[open] .next-expand{transform:rotate(180deg)}
+.next-move-detail{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:12px;padding:0 12px 12px 34px;align-items:start}
+.next-move-detail p{font-size:13px;line-height:1.5;margin:0 0 8px}.next-move-detail small{display:block;font-size:12px;color:#65745f;margin-bottom:8px}
+.next-move-detail .button{font-size:12px;min-height:40px;margin-top:8px;padding:8px}
+.next-moves-note{display:block;font-size:12px;line-height:1.5;color:#69765e;margin-top:12px}
+.next-moves-status{font-size:15px;line-height:1.5;color:#65745f}
+@media(max-width:900px){.next-move-detail{grid-template-columns:minmax(0,1fr) 108px;padding-left:12px}.next-idea{font-size:13px}.next-move-option>summary{padding:10px;gap:8px}.next-moves-heading strong{font-size:17px}}
+@media(max-width:360px){.next-move-detail{grid-template-columns:minmax(0,1fr) 88px}}
+
+.next-options{margin-top:16px;border-top:1px solid #e1e6d9;padding-top:12px}
+.next-options>summary{cursor:pointer;font-size:15px;font-weight:650;color:#355943;padding:6px 0;line-height:1.5}
+.next-options>summary span{font-size:12px;font-weight:400;color:#6a785f;margin-left:8px;white-space:nowrap}
+.next-options[open]>summary{margin-bottom:10px}
+[data-show-five]{display:none!important}
+.next-move-option{display:grid;grid-template-columns:minmax(0,1fr) 108px;gap:12px;padding:12px;align-items:center}
+.next-move-option .mini-line-preview{width:108px}
+.next-option-text{min-width:0}.next-option-text .next-rank{padding:0;min-width:auto}
+.next-option-text .next-move-title{gap:8px}.next-option-text .next-idea{margin:8px 0 0;font-size:14px;line-height:1.5}
+@media(max-width:900px){.next-move-option{grid-template-columns:minmax(0,1fr) 88px;padding:10px;gap:8px}.next-move-option .mini-line-preview{width:88px}.next-option-text .next-idea{font-size:13px}.next-move-option .mini-replay{font-size:10px}}
+@media(max-width:360px){.next-move-option{grid-template-columns:minmax(0,1fr) 76px}.next-move-option .mini-line-preview{width:76px}.next-move-title strong{font-size:19px}}
+.review-story-heading h2{font-size:23px;line-height:1.25;margin:0 0 8px}
+.review-story-heading p{font-size:14px;color:#65745f;margin:0 0 16px}
+.review-story-cards{display:grid;gap:10px}
+.review-story-move{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border:0;background:none;padding:0;color:#263e32;cursor:pointer;text-align:left;min-height:36px}
+.review-story-move strong{font-size:19px}.review-story-grade{font-size:12px;color:#607652}.review-story-grade.grade-mistake,.review-story-grade.grade-blunder{color:#a44a3b}.review-story-grade.grade-medium{color:#9c761c}
+.review-story-words{display:block;font-size:12px;line-height:1.5;color:#64735e;margin-top:7px}
+#panel-content>.panel-intro{padding:0 0 12px}#panel-content>.panel-intro h2{font-size:22px;margin:0 0 7px}#panel-content>.panel-intro p{font-size:14px;margin:0}

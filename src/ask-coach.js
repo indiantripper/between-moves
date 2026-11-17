@@ -9,7 +9,13 @@ export function coachSuggestion(fen,line,level=1350) {
   if(before.isGameOver() || !line?.pv?.[0])return null;
   let move;
   try { move=after.move(uciMove(line.pv[0])); } catch { return null; }
-  let idea=explainCandidate(fen,line,level).replace(' The engine continuation shows how play can follow.','').replace(' Compare the replies before deciding how to support it.','');
+  let idea=explainCandidate(fen,line,level).replace(' The engine continuation shows how play can follow.','').replace(' Compare the replies before deciding how to support it.','').replace(' No specific positional explanation is verified here; explore the engine’s continuation.','');
+  if(move.piece==='p'){
+    const opened=after.board().flat().filter(p=>p&&p.color===move.color&&['b','q'].includes(p.type)).filter(p=>{
+      return Array.from({length:64},(_,i)=>String.fromCharCode(97+i%8)+(1+Math.floor(i/8))).some(square=>after.attackers(square,move.color).includes(p.square)&&!before.attackers(square,move.color).includes(p.square));
+    });
+    if(opened[0])idea+=` It opens a line for your ${PIECE_NAMES[opened[0].type]}.`;
+  }
   const enemy=move.color==='w'?'b':'w';
   const guarded=after.board().flat().filter(p=>p&&p.color===move.color&&p.type!=='k'&&p.square!==move.to&&(before.isAttacked(p.square,enemy)||(p.type==='p'&&['d4','e4','d5','e5'].includes(p.square)))&&after.attackers(p.square,move.color).includes(move.to)&&!before.attackers(p.square,move.color).includes(move.from));
   guarded.sort((a,b)=>Number(before.isAttacked(b.square,enemy))-Number(before.isAttacked(a.square,enemy)));
@@ -18,6 +24,15 @@ export function coachSuggestion(fen,line,level=1350) {
   if(!move.captured && !after.isCheck() && targets.length)idea+=` From ${move.to}, your ${PIECE_NAMES[move.piece]} attacks ${targets.map(p=>`the ${PIECE_NAMES[p.type]} on ${p.square}`).join(' and ')}.`;
   const controlled=['d4','e4','d5','e5'].filter(square=>after.attackers(square,move.color).includes(move.to));
   if(controlled.length && !guarded.length && !move.captured && !after.isCheck())idea+=` It controls ${controlled.join(' and ')} in the centre.`;
+  if(move.piece==='p' && !controlled.length && !move.captured){
+    const squares=Array.from({length:64},(_,i)=>String.fromCharCode(97+i%8)+(1+Math.floor(i/8))).filter(square=>after.attackers(square,move.color).includes(move.to));
+    if(squares.length)idea+=` Your pawn controls ${squares.join(' and ')}.`;
+    if(['g3','g6','b3','b6'].includes(move.to)){
+      const bishop=move.to[0]==='g'?(move.color==='w'?'f1':'f8'):(move.color==='w'?'c1':'c8');
+      const destination=move.to[0]+(move.color==='w'?'2':'7');
+      if(after.get(bishop)?.type==='b' && !after.get(destination))idea+=` This makes room to develop your bishop to ${destination}.`;
+    }
+  }
   const hint=before.isCheck()?'Your king is in check. Look for a legal way to escape, block the check or capture the checking piece.':after.isCheckmate()?'Look for a checking move that leaves the king no escape.':move.captured?`Look for a capture of an opponent’s ${PIECE_NAMES[move.captured]}. Check how they can reply.`:move.flags.includes('k')||move.flags.includes('q')?'Can you improve your king’s position and activate a rook in one move?':targets.length?`Can you activate a ${PIECE_NAMES[move.piece]} while putting pressure on an opponent’s piece or pawn?`:controlled.length?'Look for a move that improves your control of the centre.':'Look for a piece whose activity you can improve, and check the opponent’s forcing replies.';
   const continuation=new Chess(fen),pv=[];
   for(const uci of line.pv.slice(0,8)){try{pv.push(continuation.move(uciMove(uci)).lan);}catch{break;}}

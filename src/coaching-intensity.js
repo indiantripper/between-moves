@@ -1,12 +1,13 @@
 export const COACHING_MODES = [
-  {id:'gentle',label:'Gentle',description:'Alternatives and light guidance, without move grades.'},
-  {id:'honest',label:'Honest',description:'Move grades and short explanations. Explore alternatives when you want.'},
-  {id:'silent',label:'Silent',description:'Play without automatic feedback. Review afterward, or Ask coach anytime.'},
+  {id:'coached',label:'Coached',description:'Move grades, clear ideas and five suggestions for your next move.'},
+  {id:'silent',label:'Silent',description:'Play without suggestions or grades. Review your moves afterward.'},
 ];
 export function coachingIntensity(record) {
-  return COACHING_MODES.some(mode=>mode.id===record?.coachingIntensity)?record.coachingIntensity:record?.coach===false?'silent':'honest';
+  if(record?.coachingIntensity==='silent')return 'silent';
+  if(['coached','gentle','honest'].includes(record?.coachingIntensity))return 'coached';
+  return record?.coach===false?'silent':'coached';
 }
 export function feedbackPolicy(record,finished=false) {
   const mode=coachingIntensity(record),live=mode!=='silent';
-  return {mode,guidance:finished||live,grades:finished||mode==='honest',alternatives:finished||live,evaluation:finished||live};
+  return {mode,guidance:finished||live,grades:finished||live,alternatives:finished||live,evaluation:finished||live};
 }
