@@ -18,3 +18,9 @@ test('seen and skipped tour preferences persist without suppressing a later mist
 test('the best move prompt waits until the icon can be used',()=>{
  assert.equal(nextGuideStep({hasGame:true,ready:false}),null);assert.equal(nextGuideStep({hasGame:true,ready:true}).id,'best');
 });
+test('the move badge is introduced only when it appears, before the feedback section',()=>{
+ const seen={start:true,best:true};
+ assert.equal(nextGuideStep({hasGame:true,badge:false},seen),null);
+ assert.equal(nextGuideStep({hasGame:true,badge:true,feedback:true},seen).id,'badge');
+ assert.equal(nextGuideStep({hasGame:true,badge:true,feedback:true},{...seen,badge:true}).id,'feedback');
+});

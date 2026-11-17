@@ -305,7 +305,7 @@ function paintQuickCoach() {
   const overlay=$('#board-quality-overlay');
   if(target){
     const [x,y]=squarePoint(target);
-    overlay.innerHTML=`<button id="piece-move-grade" class="piece-quality-control grade-${badge.tone}" data-grade-square="${target}" aria-label="${esc(attempt.san)}: ${esc(badge.label)}. Explain this move" aria-controls="piece-grade-popover" aria-haspopup="dialog" aria-expanded="${mobileGradeOpen}" style="left:clamp(16px,${(x+32)/8}%,calc(100% - 16px));top:clamp(16px,${(y-32)/8}%,calc(100% - 16px))"><span class="grade-disc" aria-hidden="true">${badge.symbol}</span></button>`;
+    overlay.innerHTML=`<button id="piece-move-grade" class="piece-quality-control grade-${badge.tone}" data-grade-square="${target}" aria-label="${esc(attempt.san)}: ${esc(badge.label)}. See feedback and the best move" title="Tap for feedback and the best move" aria-controls="piece-grade-popover" aria-haspopup="dialog" aria-expanded="${mobileGradeOpen}" style="left:clamp(16px,${(x+32)/8}%,calc(100% - 16px));top:clamp(16px,${(y-32)/8}%,calc(100% - 16px))"><span class="grade-disc" aria-hidden="true">${badge.symbol}</span></button>`;
   }else overlay.innerHTML='';
   const help=$('#badge-help');
   help.hidden=!(target&&matchMedia('(max-width:900px)').matches&&!state.settings.badgeHelpSeen);
@@ -1008,9 +1008,9 @@ function completeGuide(){
 function paintGuide(){
   const card=$('#guide-card');if(!state||!card)return;
   document.querySelectorAll('.guide-target').forEach(el=>el.classList.remove('guide-target'));
-  if($('dialog[open]')||positionEditor||preview?.line||!engineReady){hideGuide();return;}
+  if($('dialog[open]')||$('#piece-grade-popover').matches(':popover-open')||positionEditor||preview?.line||!engineReady){hideGuide();return;}
   const feedback=$('.best-move-lesson'),alternatives=$('[data-previous-options]'),opponent=$('.opponent-context'),next=$('[data-next-options]');
-  guideStep=nextGuideStep({hasGame:!!current,hasGames:state.games.length>0,finished:current?.finished,ready:canAskCoach(),feedback:!current?.finished&&!!focus&&!!feedback,alternatives:!current?.finished&&!!focus&&!!alternatives,opponent:!current?.finished&&!!current?.attempts.length&&!!opponent,next:!current?.finished&&!!current?.attempts.length&&!!next&&humanTurn()&&!busy,bad:!!focus&&focus.grade?.severity>0&&!!$('.consequence-replay')},state.settings.guidedTour);
+  guideStep=nextGuideStep({hasGame:!!current,hasGames:state.games.length>0,finished:current?.finished,ready:canAskCoach(),badge:!current?.finished&&!busy&&!!$('#piece-move-grade'),feedback:!current?.finished&&!!focus&&!!feedback,alternatives:!current?.finished&&!!focus&&!!alternatives,opponent:!current?.finished&&!!current?.attempts.length&&!!opponent,next:!current?.finished&&!!current?.attempts.length&&!!next&&humanTurn()&&!busy,bad:!!focus&&focus.grade?.severity>0&&!!$('.consequence-replay')},state.settings.guidedTour);
   const target=guideTarget();if(!target||!target.getClientRects().length){hideGuide();return;}
   target.classList.add('guide-target');card.hidden=false;
   const rect=target.getBoundingClientRect(),visible=rect.top>=0&&rect.top<innerHeight-80&&rect.bottom>0;
@@ -1124,7 +1124,7 @@ document.addEventListener('toggle',e=>{
   if(details.isConnected&&details.matches('details[data-coach-section]'))rememberSection(details.dataset.coachSection,details.open);
 },true);
 document.addEventListener('pointerdown',e=>{gradeTriggerWasOpen=!!e.target.closest('#piece-move-grade,#mobile-move-grade') && $('#piece-grade-popover').matches(':popover-open');},true);
-$('#piece-grade-popover').addEventListener('toggle',e=>{if(e.newState==='closed'){mobileGradeOpen=false;for(const b of document.querySelectorAll('[aria-controls="piece-grade-popover"]'))b.setAttribute('aria-expanded','false');}});
+$('#piece-grade-popover').addEventListener('toggle',e=>{scheduleGuide();if(e.newState==='closed'){mobileGradeOpen=false;for(const b of document.querySelectorAll('[aria-controls="piece-grade-popover"]'))b.setAttribute('aria-expanded','false');}});
 window.addEventListener('scroll',()=>{closeGradePopover();scheduleGuide();},{passive:true});
 $('#setup').addEventListener('close',scheduleGuide);
 let resizeFrame;
