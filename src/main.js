@@ -13,6 +13,7 @@ import { COACHING_MODES, coachingIntensity as savedIntensity, feedbackPolicy } f
 import { COACH_QUESTIONS, coachQuestion } from './coach-questions.js';
 import { resetPractice } from './reset-practice.js';
 import { bestMovePreview } from './best-move-preview.js';
+import { miniLineMarkup } from './mini-line.js';
 import { compareMove } from './move-comparison.js';
 import './whatif.css';
 import './mobile-coach.css';
@@ -30,6 +31,7 @@ import { placeCoachPopover } from './coach-popover.js';
 import { moveBadge, playableChoices, pieceQualityTarget } from './quick-coach.js';
 import { moveInWords, moveWords } from './move-language.js';
 import './move-language.css';
+import './compact-coach.css';
 import { moveCaption, moveTranslation } from './move-caption.js';
 import { previewHighlights } from './coach-highlights.js';
 import { coachSuggestion, usedCoachHelp, previewSuggestion, previewLesson } from './ask-coach.js';
@@ -117,7 +119,8 @@ function opponentIdeaMarkup() {
   const cached=positionAnalysis.cache.get(move.after)?.analysis;
   const idea=explainOpponentMove({before:move.before,uci:move.lan,previousMove:history[index-1],analysis:cached?{...cached,fen:move.after}:null,level:playerLevel()});
   if(!idea)return '';
-  return `<div class="opponent-idea"><span class="opponent-idea-label">${next?`NEXT ${idea.side.toUpperCase()} REPLY`:`${idea.side.toUpperCase()}’S IDEA`} · ${esc(idea.san)}</span><p>${esc(idea.reason)}</p><p><strong>Possible plan:</strong> ${esc(idea.plan)}</p>${idea.watch?`<p class="opponent-idea-watch"><strong>Watch:</strong> ${esc(idea.watch)}</p>`:''}</div>`;
+  const content=`<div class="opponent-idea"><span class="opponent-idea-label">${next?`NEXT ${idea.side.toUpperCase()} REPLY`:`${idea.side.toUpperCase()}’S IDEA`} · ${esc(idea.san)}</span><p>${esc(idea.reason)}</p><p><strong>Possible plan:</strong> ${esc(idea.plan)}</p>${idea.watch?`<p class="opponent-idea-watch"><strong>Watch:</strong> ${esc(idea.watch)}</p>`:''}</div>`;
+  return focus?`<details class="opponent-context"><summary>${idea.side}’s last move · ${esc(idea.san)}</summary>${content}</details>`:content;
 }
 function paintOpponentIdea() { const slot=$('#opponent-idea-slot');if(slot)slot.innerHTML=opponentIdeaMarkup(); }
 function evaluationState() {
@@ -225,7 +228,8 @@ function moveExplanationMarkup(attempt) {
   const translation=`<p class="move-in-words">${esc(moveWords(attempt.before,attempt.uci))}</p>`;
   if(!comparison)return translation+attempt.explanation.facts.map(t=>`<p>${esc(t)}</p>`).join('');
   const c=comparison;
-  return (c.bestSAN===c.playedSAN?'':translation)+`${c.bestSAN===c.playedSAN?'':c.cause?`<p>${esc(c.cause)}</p>`:`<p>The engine prefers ${esc(c.bestSAN)}. A specific positional reason has not been identified by the current coaching rules.</p>`}<div class="best-move-lesson"><button class="best-move-preview-trigger" data-best-ply="${attempt.ply}" data-best-uci="${attempt.uci}" aria-label="Preview ${esc(c.bestSAN)} and the opponent’s reply" ${busy||coachHelp?.stage==='loading'?'disabled':''}>${c.bestSAN===c.playedSAN?'Engine choice':'Best was'} <strong>${esc(c.bestSAN)}</strong><span aria-hidden="true"> ↗</span></button><small class="move-translation">${esc(moveWords(attempt.before,attempt.lines[0].pv[0]))}</small><p>${esc(c.bestIdea)}</p></div>${c.cost?`<p class="comparison-cost">${esc(c.cost)}</p>`:''}${c.reply?`<p><strong>Strongest reply:</strong> ${esc(c.reply)}</p>`:''}<details class="move-line-comparison"><summary>Compare engine lines</summary><p><strong>Your move:</strong> ${esc(c.playedLine.join('  '))}</p><p><strong>Alternative:</strong> ${esc(c.bestLine.join('  '))}</p><small>Saved evaluations: ${esc(c.playedScore)} vs ${esc(c.bestScore)} · White’s perspective · depth ${c.depth||'—'}. Evaluation includes position and tactics, not just material. These are example engine continuations; other replies are possible.</small>${c.uncertain?'<p>The precise strategic reason is not yet covered by our rules; the comparison above shows the engine evidence.</p>':''}</details>`;
+  return (c.bestSAN===c.playedSAN?'':translation)+`${attempt.grade.severity>0&&c.bestSAN!==c.playedSAN&&c.cause?`<p>${esc(c.cause)}</p>`:''}<div class="best-move-lesson"><div class="best-move-copy"><button class="best-move-preview-trigger" data-best-ply="${attempt.ply}" data-best-uci="${attempt.uci}" aria-label="Preview ${esc(c.bestSAN)} and the opponent’s reply" ${busy||coachHelp?.stage==='loading'?'disabled':''}>${c.bestSAN===c.playedSAN?'Best move':'Best was'} <strong>${esc(c.bestSAN)}</strong><span aria-hidden="true"> ↗</span></button><small class="move-translation">${esc(moveWords(attempt.before,attempt.lines[0].pv[0]))}</small><p>${esc(c.bestIdea)}</p></div>${miniLineMarkup(attempt.before,attempt.lines[0].pv,flipped)}</div>${c.reply?`<p class="coach-reply-summary"><strong>Watch for:</strong> ${esc(c.reply)}</p>`:''}`;
+
 }
 function closeGradePopover(restoreFocus=false) {
   const popup=$('#piece-grade-popover');
@@ -348,7 +352,7 @@ function coachHelpMarkup() {
   const legend=annotations?.marks.length?`<div class="coach-highlight-legend" aria-label="Board highlights">${[['move','Move'],['threat','! Threat'],['pin','P Pin / queen line'],['support','Support'],['idea','Key square']].filter(([role])=>roles.has(role)).map(([role,label])=>`<span class="legend-${role}">${label}</span>`).join('')}<small>Red dashed = possible reply</small></div>`:'';
   const original=h.suggestion?`<p>Move your ${esc(h.suggestion.piece)} from ${h.suggestion.from} to ${h.suggestion.to}.</p><p>${esc(h.suggestion.idea)}</p><p class="eyebrow">ONE ENGINE CONTINUATION</p><p class="help-line">${esc(h.suggestion.line.join('  '))}</p>`:'';
   let text=h.stage==='loading'?'<h3>Finding a useful move…</h3><p>Analysing the position on your board.</p>':h.stage==='error'?`<h3>Couldn’t analyse this position</h3><p>${esc(h.error)}</p><button class="button secondary" id="coach-retry-help">Try again</button>`:h.stage==='hint'?`<h3>A hint first</h3><p>${esc(h.suggestion.hint)}</p><button class="button primary" id="coach-show-move">Show move + idea</button>`:`<h3>${esc(lesson?.heading || 'Consider '+h.suggestion.san)}</h3>${legend}${lesson?`<div class="coach-step-lesson" data-step="${lesson.step}"><span class="eyebrow">MOVE ${lesson.step} OF ${lesson.total}</span><p class="move-in-words">${esc(lesson.words)}</p><p><strong>Idea:</strong> ${esc(lesson.reason)}</p>${lesson.actor==='opponent'?`<p><strong>Possible plan:</strong> ${esc(lesson.plan)}</p>`:''}<p class="coach-step-watch"><strong>Watch:</strong> ${esc(lesson.watch)}</p>${lesson.next?`<p class="coach-step-next"><strong>Next in this line:</strong> ${esc(lesson.next)}</p>`:''}</div>`:''}<div class="coach-preview-actions"><button class="button secondary" id="coach-preview-move">Preview move</button>${h.suggestion.pv.length>1?'<button class="button secondary" id="coach-preview-reply">Preview reply</button>':''}<button class="button primary" id="coach-play-move" ${canPlayCoachMove()?'':'disabled'}>${lesson?'Play '+esc(h.suggestion.san):'Play this move'}</button></div>${lesson?`<details class="coach-original-idea"><summary>Original suggestion & full line</summary>${original}</details>`:original}<small>Depth ${h.depth} · Stockfish 19 Lite. One possible line; the opponent can choose another reply.</small>`;
-  return `<section class="coach-help" aria-live="polite"><span class="eyebrow">ASK COACH · ${preview?.coach?'BOARD PREVIEW':preview?'DISPLAYED POSITION':'YOUR CURRENT POSITION'}</span>${text}<button class="button subtle" id="coach-dismiss">Dismiss</button><p class="analysis-note">Help marks this decision as assisted, including when coaching is off.</p></section>`;
+  return `<section class="coach-help" aria-live="polite"><span class="eyebrow">ASK COACH · ${preview?.coach?'BOARD PREVIEW':preview?'DISPLAYED POSITION':'YOUR CURRENT POSITION'}</span>${text}<button class="button subtle" id="coach-dismiss">Dismiss</button></section>`;
 }
 async function askCoach({direct=true}={}) {
   if(!canAskCoach())return;
@@ -407,6 +411,7 @@ function dismissCoachHelp() {
 }
 function render() {
   if (!state) return;
+  stopMiniReplay();
   const active = current && !current.finished;
   $('#coaching-intensity').value=intensity;
   $('#coaching-intensity').title=COACHING_MODES.find(m=>m.id===intensity).description;
@@ -444,9 +449,7 @@ function renderCoach(active) {
     $('#panel-content').innerHTML=`<section class="desktop-question-coach"><span class="eyebrow">ASK COACH</span><h2>Let’s look at the board.</h2>${$('#mobile-quick-coach').innerHTML.replaceAll('id="quick-','id="desktop-quick-')}</section>`;return;
   }
   const f=focus, policy=coaching(),gentle=!policy.grades;
-  let html=`<div class="coach-header"><div><span class="eyebrow">YOUR CORNER OF THE BOARD</span><h2>Let’s think it through.</h2></div></div>`;
-  html+=`<p class="coaching-description">${esc(current?.finished?'Review your moves with full explanations and alternatives.':COACHING_MODES.find(m=>m.id===intensity).description)}</p>`;
-  html+=`<div class="ask-coach-row"><small>Stuck? Find a move and understand its idea.</small><button class="button secondary" id="ask-coach" ${canAskCoach()?'':'disabled'}>✦ Ask coach</button></div><div class="mobile-coach-tabs"><button class="button secondary ${mobileCoachView==='coach'?'active':''}" data-coach-view="coach" aria-pressed="${mobileCoachView==='coach'}">Feedback</button><button class="button secondary ${mobileCoachView==='five'?'active':''}" data-coach-view="five" aria-pressed="${mobileCoachView==='five'}">Top 5</button></div>`;
+  let html=`<div class="coach-toolbar"><h2>Your coach</h2><button class="button secondary" id="ask-coach" ${canAskCoach()?'':'disabled'}>✦ Ask coach</button></div><div class="mobile-coach-tabs"><button class="button secondary ${mobileCoachView==='coach'?'active':''}" data-coach-view="coach" aria-pressed="${mobileCoachView==='coach'}">Feedback</button><button class="button secondary ${mobileCoachView==='five'?'active':''}" data-coach-view="five" aria-pressed="${mobileCoachView==='five'}">Top 5</button></div>`;
 
   html+=coachHelpMarkup();
   html+='<div class="coach-overview">';
@@ -454,27 +457,20 @@ function renderCoach(active) {
     html+=`<div class="coach-empty"><span class="empty-icon">♘</span><h3>Just you and the board.</h3><p>Play freely. Your moves are saved for the review. Bring the coach back whenever you like.</p></div>`;
   } else if (f && (coachOn || !active)) {
     const grade=f.grade;
-    html+=`<div class="feedback-card ${gentle?'gentle-feedback':'severity-'+grade.severity}"><div class="feedback-top"><span class="move-token">${isFreePlay()?(new Chess(f.before).turn()==='w'?'White · ':'Black · '):''}${esc(f.san)}</span>${gentle?'<strong>The idea</strong>':`<strong>${esc(grade.label)}</strong><span class="feedback-symbol">${grade.severity>=1?'?!':'✓'}</span>`}</div>${gentle?`<p class="move-in-words">${esc(moveWords(f.before,f.uci))}</p><p>${esc(f.actual?explainCandidate(f.before,f.actual,playerLevel()):'Analysis was interrupted. Retry the move to explore its ideas.')}</p>`:moveExplanationMarkup(f)}<div id="opponent-idea-slot">${opponentIdeaMarkup()}</div><small>${f.inherited?'Original line · saved analysis':f.retry?'Practice variation · assisted':f.assisted?'Coached first attempt':'Unassisted first attempt'}</small></div>`;
+    html+=`<div class="feedback-card ${gentle?'gentle-feedback':'severity-'+grade.severity}"><div class="feedback-top"><span class="move-token">${isFreePlay()?(new Chess(f.before).turn()==='w'?'White · ':'Black · '):''}${esc(f.san)}</span>${gentle?'<strong>The idea</strong>':`<strong>${esc(grade.label)}</strong><span class="feedback-symbol">${grade.severity>=1?'?!':'✓'}</span>`}</div>${gentle?`<p class="move-in-words">${esc(moveWords(f.before,f.uci))}</p><p>${esc(f.actual?explainCandidate(f.before,f.actual,playerLevel()):'Analysis was interrupted. Retry the move to explore its ideas.')}</p>`:moveExplanationMarkup(f)}<div id="opponent-idea-slot">${opponentIdeaMarkup()}</div></div>`;
     html+=`</div><div class="coach-candidates">${!gentle&&!current.finished?`<details class="optional-alternatives" ${mobileCoachView==='five'?'open':''}><summary>Explore five alternatives</summary>`:''}<div class="section-heading"><h3>Five ways forward</h3><span>Before your ${esc(f.san)}</span></div><div class="candidate-labels"><span>ENGINE CHOICE</span><span>WHITE EVAL.</span></div><div class="candidates">${f.lines.map((line,i)=>{
       const san=sanLine(f.before,line.pv,1)[0], mine=line.pv[0]===f.uci, opening=openingForMove(f.before,line.pv[0]);
       return `<button class="candidate ${mine?'your-move':''}" data-candidate="${i}" ${busy?'disabled':''}><span class="candidate-rank">${i+1}</span><span class="candidate-description"><span class="candidate-title"><strong>${esc(san)}</strong>${mine?'<span class="mine-label">YOUR MOVE</span>':''}</span><small class="move-translation">${esc(moveWords(f.before,line.pv[0]))}</small>${opening?`<small>${esc(opening.name)}</small>`:''}</span><span class="candidate-eval">${displayScore(line,new Chess(f.before).turn())}</span><span class="candidate-arrow">↗</span></button>`;
-    }).join('')}</div><p class="analysis-note">Depth ${f.depth} · Stockfish 19 Lite · evaluations favour White when positive. Close scores can be equally playable.</p><div id="candidate-explanation">${variationExplanation()}</div>${!gentle&&!current.finished?'</details>':''}`;
+    }).join('')}</div><div id="candidate-explanation">${variationExplanation()}</div>${!gentle&&!current.finished?'</details>':''}`;
     html+=`</div><div class="coach-overview"><div class="decision-buttons"><button class="button secondary" id="retry" ${busy?'disabled':''}>↶ Retry this move</button>${f.actual?.pv?.length>1?`<button class="button secondary" id="show-punishment" ${busy?'disabled':''}>${gentle?'Explore continuation':'See strongest reply'} ↗</button>`:''}</div>`;
-    if (!gentle && !f.lines.some(l=>l.pv[0]===f.uci)) html+=`<p class="analysis-note">Your move ${esc(f.san)}: ${displayScore(f.actual,new Chess(f.before).turn())}. Analysed separately from the top five.</p>`;
+
   } else {
-    html+=`<div class="coach-empty"><div class="empty-board">♘<span>✦</span></div><h3>${current?'Your move. Your discovery.':'A good habit starts here.'}</h3><p>${current?'Make a move on the board. We’ll compare five possibilities, unpack the idea, and keep what you learn.':'Choose an opening and a worthy opponent. Your coach will help you understand the choices between moves.'}</p>${!current?'<button class="button primary" id="start-first">Start your first practice ↗</button>':''}</div>`;
+    html+=`<div class="coach-empty"><div class="empty-board" aria-hidden="true">♘</div><h3>${current?'Your move. Your discovery.':'A good habit starts here.'}</h3><p>${current?'Make a move. Your coach will explain the idea and show a better option when there is one.':'Choose an opening and a worthy opponent. Your coach will help you understand the choices between moves.'}</p>${!current?'<button class="button primary" id="start-first">Start your first practice ↗</button>':''}</div>`;
   }
   html+='</div>';
-  if(!f && coachOn)html+='<div class="coach-candidates"><p class="muted">Alternatives appear after your move. Ask coach for help with the current position.</p></div>';
+
   html+='<div class="coach-overview">';
   if(!f && (coachOn||!active))html+=`<div id="opponent-idea-slot">${opponentIdeaMarkup()}</div>`;
-  if(current && !isFreePlay() && coachOn && !preview){
-    const last=game.history({verbose:true}).at(-1);
-    const manual=current.overrides?.find(o=>o.ply===current.moves.length-1&&o.uci===last?.lan);
-    if(last && last.color!==current.color)html+=`<div class="opponent-reply"><span class="eyebrow">${manual?'YOUR WHAT-IF REPLY':'OPPONENT’S REPLY'}</span><strong>${esc(last.san)}</strong><p class="move-in-words">${esc(moveInWords(last))}</p>${manual?`<p>You chose ${esc(last.san)} instead of ${esc(manual.replacedSan)}. It’s your turn to respond.</p>`:''}<p>${game.isCheck()?'Your king is in check. You must deal with the check.':last.captured?`Your opponent captured your ${PIECE_NAMES[last.captured]} on ${last.to}.`:'Look at what changed. You can rewind as many moves as you like and try a different continuation.'}</p></div>`;
-  }
-  const pattern=null;
-  if(coachOn || !active) html+=`<div class="habit-card"><span class="habit-icon">✦</span><div><span class="eyebrow">${pattern?'A PATTERN TO NOTICE':'ONE SMALL HABIT'}</span><p>${esc(pattern?.tip || 'Before you move, ask: what is my opponent threatening?')}</p></div></div>`;
   if (current?.finished) html+=`<div class="review-banner"><strong>${esc(current.result || 'Practice saved')}</strong><p>Select a move in the Moves tab to revisit its position and coaching.</p><button class="button secondary" id="review-moves">Explore game moves →</button></div>`;
   $('#panel-content').innerHTML=html+'</div>';
 }
@@ -820,9 +816,19 @@ function releaseDrag(e,cancelled=false) {
 document.addEventListener('pointerup',e=>releaseDrag(e));
 document.addEventListener('pointercancel',e=>releaseDrag(e,true));
 window.addEventListener('blur',()=>{if(dragState)releaseDrag({pointerId:dragState.pointerId,clientX:0,clientY:0},true);});
+let miniReplayTimer;
+function stopMiniReplay(){clearInterval(miniReplayTimer);miniReplayTimer=null;for(const mini of document.querySelectorAll('.mini-line-preview')){const btn=mini.querySelector('[data-mini-replay]');btn.setAttribute('aria-pressed','false');btn.textContent='▶ Replay';}}
+function replayMini(button){
+  const mini=button.closest('.mini-line-preview'),wasPlaying=button.getAttribute('aria-pressed')==='true';stopMiniReplay();if(wasPlaying)return;
+  const frames=[...mini.querySelectorAll('[data-mini-frame]')],labels=[...mini.querySelectorAll('.mini-frame-labels span')];let index=0;
+  const paint=()=>{frames.forEach((frame,i)=>frame.classList.toggle('is-current',i===index));mini.dataset.miniIndex=index;mini.querySelector('.mini-caption').textContent=labels[index].textContent;};
+  paint();button.setAttribute('aria-pressed','true');button.textContent='Ⅱ Pause';
+  miniReplayTimer=setInterval(()=>{if(!mini.isConnected){stopMiniReplay();return;}index++;if(index>=frames.length){stopMiniReplay();return;}paint();},1100);
+}
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b || b.disabled)return;
   if(positionEditor && !['editor-resume','editor-undo','editor-cancel','flip','reset-board'].includes(b.id)){toast('Resume or cancel your position edits first.');return;}
+  if(b.hasAttribute('data-mini-replay')){replayMini(b);return;}
   if(b.hasAttribute('data-best-return')){returnToGame();return;}
   if(b.dataset.bestStep){stepPreview(Number(b.dataset.bestStep));return;}
   if(b.dataset.bestPly!=null){previewBestMove(Number(b.dataset.bestPly),b.dataset.bestUci);return;}

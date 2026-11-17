@@ -1,0 +1,45 @@
+/* One page scroll; the coach is no longer a fixed-height scrolling box. */
+.side-panel{position:static;height:auto;min-height:0;max-height:none;overflow:visible;align-self:start}
+#panel-content{flex:none;min-height:0;height:auto;max-height:none;overflow:visible;overscroll-behavior:auto;scrollbar-gutter:auto;padding:20px}
+.coach-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.coach-toolbar h2{margin:0;font-size:20px;letter-spacing:-.5px}
+.coach-toolbar .button{min-height:40px;padding:7px 11px;font-size:13px}
+.coach-empty{padding:22px 8px;text-align:center}
+.coach-empty .empty-board{width:66px;height:66px;font-size:46px;background-size:28px 28px;background-position:0 0,14px 14px;margin:0 auto 18px;border-radius:14px}
+.coach-empty h3{font-size:20px;margin-bottom:10px}
+.coach-empty p{font-size:15px;line-height:1.6;max-width:340px;margin:0 auto}
+.feedback-card{padding:14px}
+.feedback-card p{font-size:15px;line-height:1.55;margin-bottom:10px}
+.feedback-top{margin-bottom:10px;gap:10px}
+.best-move-lesson{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:12px;align-items:start;margin:10px 0;padding:10px}
+.best-move-copy{min-width:0}
+.best-move-copy p{margin:7px 0 0!important;font-size:14px;line-height:1.5}
+.best-move-copy .move-translation{font-size:12px}
+.mini-line-preview{margin:0;min-width:0;width:130px}
+.mini-board{width:100%;aspect-ratio:1;border:2px solid #e4e5d9;border-radius:5px;overflow:hidden;background:#eee9d8}
+.mini-board svg{display:block;width:100%;height:100%}
+.mini-state{display:none}.mini-state.is-current{display:inline}
+.mini-line-preview figcaption{display:flex;align-items:center;justify-content:space-between;gap:4px;padding-top:3px}
+.mini-caption{font-size:11px;font-weight:600;color:#3e5a43}
+.mini-replay{background:none;border:0;min-height:32px;padding:3px 2px;color:#2a5841;font-size:11px;white-space:nowrap}
+.coach-reply-summary{margin-bottom:0!important}
+.opponent-context{margin-top:12px;border-top:1px solid #dbe3d2;padding-top:3px}
+.opponent-context>summary{cursor:pointer;font-size:13px;font-weight:600;padding:9px 0;color:#35543f}
+.opponent-context .opponent-idea{border-top:0;margin-top:0;padding-top:5px}
+.decision-buttons{margin-top:12px;gap:8px}
+.decision-buttons .button{min-height:40px;font-size:13px;padding:8px;gap:4px}
+.optional-alternatives{margin-top:12px}
+@media(min-width:901px){.side-panel{position:static;height:auto;min-height:0;max-height:none}#panel-content{overflow:visible;flex:none}}
+@media(max-width:900px){
+  .coach-toolbar{display:none}
+  #panel-content{padding:14px}
+  .feedback-card{padding:12px}
+  .feedback-card p{font-size:14px;line-height:1.5}
+  .best-move-lesson{grid-template-columns:minmax(0,1fr) 108px;gap:8px;padding:8px}
+  .mini-line-preview{width:108px}
+  .best-move-preview-trigger{font-size:14px}
+  .best-move-copy p{font-size:13px}
+  .coach-empty{padding:16px 5px}
+  .coach-empty p{font-size:14px}
+}
+@media(max-width:360px){.best-move-lesson{grid-template-columns:minmax(0,1fr) 88px}.mini-line-preview{width:88px}.mini-replay{font-size:10px}.mini-caption{font-size:10px}}
