@@ -63,9 +63,9 @@ $('#app').innerHTML = `
   <main><h1 class="sr-only">Between Moves chess practice</h1><div class="practice-brand-bar"><div class="brand-lockup"><a class="compact-brand" href="./" aria-label="Between Moves home"><span class="compact-brand-knight" aria-hidden="true">♞</span><span>between<span class="compact-brand-light">moves</span></span></a><p class="brand-tagline">Understand every move.</p></div><div class="practice-actions masthead-actions" aria-label="Practice controls"><button class="icon-button top-reset" id="reset-board" aria-label="Reset board" title="Reset board · previous game stays saved"><span aria-hidden="true">↻</span><span class="reset-label">Reset</span></button><div class="new-game-anchor"><button class="button primary" id="new-game" aria-label="New practice"><span aria-hidden="true">＋</span><span class="new-practice-label">New practice</span></button><div id="first-game-coachmark" class="first-game-coachmark" role="status" hidden><strong>Start your first game</strong><span>Tap + to choose your practice.</span></div></div><button class="icon-button top-flip" id="flip" aria-label="Flip board" title="Flip board"><span aria-hidden="true">⇅</span></button></div></div>
     <div class="workspace"><section class="play-area" aria-label="Chess game">
       <div class="player-bar practice-topbar"><div class="practice-identity"><div><strong id="opponent-name">Your practice partner</strong><small id="opponent-caption">Getting the board ready</small></div><span id="engine-status" class="status-pill">Loading engine…</span></div></div>
-      <div class="timeline" aria-label="Game navigation"><div class="timeline-buttons"><button class="icon-button" id="history-start" aria-label="Go to start" title="Go to start">⇤</button><button class="icon-button" id="history-back" aria-label="Previous move" title="Previous move (left arrow)">←</button><button class="icon-button" id="history-next" aria-label="Next move" title="Next move (right arrow)">→</button><button class="icon-button" id="history-live" aria-label="Go to latest position" title="Go to latest position">⇥</button></div><span id="history-position">Starting position</span><button id="mobile-best-move" class="board-best-button" aria-label="Ask coach: show best next move" title="Ask coach"><span aria-hidden="true">✦</span></button><span class="playback-anchor"><button id="resume-play" class="board-resume-button" aria-label="Resume play" title="Resume play" hidden><span aria-hidden="true">▶</span></button></span><label class="coaching-switch"><span class="sr-only">Coaching intensity</span><select id="coaching-intensity" aria-label="Coaching intensity">${COACHING_MODES.map(m=>`<option value="${m.id}">${m.label}</option>`).join('')}</select></label></div>
+      <div class="timeline" aria-label="Game navigation"><div class="timeline-buttons"><button class="icon-button" id="history-start" aria-label="Go to start" title="Go to start">⇤</button><button class="icon-button" id="history-back" aria-label="Previous move" title="Previous move (left arrow)">←</button><button class="icon-button" id="history-next" aria-label="Next move" title="Next move (right arrow)">→</button><button class="icon-button" id="history-live" aria-label="Go to latest position" title="Go to latest position">⇥</button></div><span id="history-position">Starting position</span><button id="mobile-best-move" class="board-best-button" aria-label="Ask coach: show best next move" title="Ask coach"><span aria-hidden="true">✦</span></button><div id="side-to-play" class="side-to-play" hidden><span>To move</span><div role="group" aria-label="Side to move"><button type="button" data-editor-turn="w" aria-pressed="false">White</button><button type="button" data-editor-turn="b" aria-pressed="false">Black</button></div></div><span class="playback-anchor"><button id="resume-play" class="board-resume-button" aria-label="Resume play" title="Resume play" hidden><span aria-hidden="true">▶</span></button></span><label class="coaching-switch"><span class="sr-only">Coaching intensity</span><select id="coaching-intensity" aria-label="Coaching intensity">${COACHING_MODES.map(m=>`<option value="${m.id}">${m.label}</option>`).join('')}</select></label></div>
       <div id="playback-coachmark" class="playback-coachmark" role="status" hidden><span>Ⅱ Pause opponent to study · ▶ Resume</span><button id="dismiss-playback-hint" aria-label="Dismiss play and pause hint">×</button></div>
-      <div id="position-editor-bar" class="position-editor-bar" hidden><div><strong>Edit position</strong><p>Drag either side’s pieces freely. Your original game stays saved.</p></div><div class="position-editor-actions"><label>Side to play<select id="editor-turn"><option value="w">White</option><option value="b">Black</option></select></label><button class="button secondary" id="editor-undo">Undo edit</button><button class="button subtle" id="editor-cancel">Cancel</button></div><small>You’ll play the selected side. Resume when your setup is ready.</small><p id="position-editor-error" role="alert" hidden></p></div>
+      <p id="position-editor-error" class="position-editor-error" role="alert" hidden></p>
       <div id="opponent-edit-bar" class="opponent-edit-bar" role="status" hidden></div>
       <div class="board-shell"><div class="board" id="board" role="group" aria-label="Chessboard"></div><svg id="arrows" class="arrows" viewBox="0 0 800 800" aria-hidden="true"><defs><marker id="arrowhead" markerWidth="4" markerHeight="4" refX="2.5" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4" fill="#d78d2a"/></marker></defs><g id="coach-board-lines"></g><line id="arrow-line" stroke="#d78d2a" stroke-opacity=".86" stroke-width="12" stroke-linecap="round" marker-end="url(#arrowhead)" /></svg><div id="board-quality-overlay" class="board-quality-overlay"></div></div>
       <button id="badge-help" class="badge-discovery" aria-controls="piece-grade-popover" hidden></button>
@@ -183,8 +183,8 @@ function drawBoard() {
   closeGradePopover();
   const shown = shownGame();
   $('.play-area').classList.toggle('editing-position',!!positionEditor);
-  $('#position-editor-bar').hidden=!positionEditor;
-  if(positionEditor){$('#position-editor-bar > small').textContent=isFreePlay()?'You control both sides. Choose whose turn comes next.':'You’ll play the selected side. Resume when your setup is ready.';$('#editor-turn').value=positionEditor.turn;$('#editor-undo').disabled=!positionEditor.past.length;}
+  $('#side-to-play').hidden=!positionEditor;
+  document.querySelectorAll('[data-editor-turn]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.editorTurn===positionEditor?.turn)));
   const question=coachHelp?.quick&&!preview&&coachHelp?.suggestion?coachQuestion(coachHelp.suggestion,coachHelp.question||'why',playerLevel()):null;
   const highlights=preview?.bestAlternative?previewHighlights(preview.suggestion,preview.step,playerLevel()):preview?.coach?previewHighlights(coachHelp?.suggestion,preview.step,playerLevel()):question||{marks:[],lines:[]};
   const marked=new Map(highlights.marks.map(m=>[m.square,m]));
@@ -435,7 +435,7 @@ function render() {
   $('#opponent-caption').textContent = current ? isFreePlay()?'You control White and Black':`${current.color==='w'?'Black':'White'} · target strength` : 'Ready when you are';
   $('#your-color').textContent = current ? isFreePlay()?'· Both sides':`· ${current.color==='w'?'White':'Black'}` : '';
   $('#your-caption').textContent = 'Coach · full-strength analysis';
-  $('#engine-status').textContent = positionEditor?'Editing position':!engineReady ? 'Loading engine…' : current?.paused ? 'Paused' : busy ? 'Thinking…' : preview?.opponentEdit ? 'What-if move' : preview ? 'Exploring' : current?.finished ? 'Review' : awaiting ? 'Your decision' : !current ? 'Ready to play' : isFreePlay()?`${game.turn()==='w'?'White':'Black'} to play`:game.turn()===current.color ? 'Your turn' : 'Opponent’s turn';
+  $('#engine-status').textContent = positionEditor?'Paused':!engineReady ? 'Loading engine…' : current?.paused ? 'Paused' : busy ? 'Thinking…' : preview?.opponentEdit ? 'What-if move' : preview ? 'Exploring' : current?.finished ? 'Review' : awaiting ? 'Your decision' : !current ? 'Ready to play' : isFreePlay()?`${game.turn()==='w'?'White':'Black'} to play`:game.turn()===current.color ? 'Your turn' : 'Opponent’s turn';
   const displayedGame=preview?.historyPly!=null ? positionAt(current,preview.historyPly) : game;
   const recognised=preview?.line ? openingAt(preview.fen) : identifyOpening(displayedGame);
   $('#opening-name').textContent = positionEditor?'Position editor':recognised ? `${recognised.eco} · ${recognised.name}` : 'Opening not yet identified';
@@ -511,6 +511,7 @@ function renderCoach(active) {
   if(preview?.coach){$('#panel-content').innerHTML=coachHelpMarkup();return;}
   let html='<div class="coach-toolbar"><h2>Your coach</h2></div>';
   if(!current){$('#panel-content').innerHTML=html+'<p>Start a practice to explore your next moves.</p>';return;}
+  if(positionEditor){$('#panel-content').innerHTML='<p class="next-moves-status">Choose who moves next, then press ▶.</p>';return;}
   if(!coaching().guidance){$('#panel-content').innerHTML=html+'<div class="coach-empty"><h3>Just you and the board.</h3><p>Play freely. Review afterward, or switch to Coached for guidance.</p></div>';return;}
   if(focus){
     const f=focus;
@@ -838,7 +839,7 @@ async function resumeEditedPosition() {
     positionEditor=null;current=record;state.games.push(record);state.active=record.id;game=historyGame();generation++;
     preview=null;coachHelp=null;arrow=null;selected=null;focus=null;awaiting=false;retrying=true;tab='coach';flipped=current.color==='b';
     if(game.isGameOver())finishGame(terminalResult());
-    await persist();render();toast(`Position ready. ${current.color==='w'?'White':'Black'} to play. Your original game is saved.`);
+    await persist();render();resumeSession();
     if(matchMedia('(max-width:900px)').matches)scrollToSection('board');
   }catch(error){$('#position-editor-error').textContent=error.message;$('#position-editor-error').hidden=false;}
 }
@@ -937,7 +938,8 @@ function replayMini(button){
 }
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b || b.disabled)return;
-  if(positionEditor && !['resume-play','editor-undo','editor-cancel','flip','reset-board'].includes(b.id)){toast('Resume or cancel your position edits first.');return;}
+  if(positionEditor && !b.dataset.editorTurn && !['resume-play','editor-undo','editor-cancel','flip','reset-board'].includes(b.id)){toast('Resume or cancel your position edits first.');return;}
+  if(b.dataset.editorTurn&&positionEditor){positionEditor.turn=b.dataset.editorTurn;$('#position-editor-error').hidden=true;drawBoard();return;}
   if(b.hasAttribute('data-mini-replay')){replayMini(b);return;}
   if(b.hasAttribute('data-best-return')){returnToGame();return;}
   if(b.dataset.bestStep){stepPreview(Number(b.dataset.bestStep));return;}
@@ -967,7 +969,6 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{
   if(e.target.name==='coachingIntensity')updateSetupCoachingDescription();
-  if(e.target.id==='editor-turn' && positionEditor){positionEditor.turn=e.target.value;$('#resume-play').title=`Resume · ${e.target.value==='w'?'White':'Black'} to play`;}
   if(e.target.id==='coaching-intensity'){
     intensity=e.target.value;coachOn=intensity!=='silent';
     if(current){current.coachingIntensity=intensity;current.coach=coachOn;}

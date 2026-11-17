@@ -6,12 +6,12 @@ import { positionAt,forkSession,replaceOpponentLine,historyRows } from '../src/t
 import { moveCaption } from '../src/move-caption.js';
 function source(){const g=new Chess();g.move('d4');return {id:'original',color:'b',moves:['d2d4'],attempts:[],level:1350,opponent:1500,coach:true};}
 function e4Draft(record){let fen=positionAt(record,record.moves.length).fen();fen=moveDraftPiece(fen,'d4','d2');return moveDraftPiece(fen,'e2','e4');}
-test('pieces can be freely rearranged and resumed as either side without changing the source game',()=>{
+test('rearranging and choosing the next side preserves the player side and original game',()=>{
   const record=source(),before=structuredClone(record),fen=e4Draft(record);
   for(const turn of ['w','b']){
     const branch=editedSession(record,fen,turn,'new-'+turn),game=positionAt(branch,0);
     assert.equal(game.get('d2').type,'p');assert.equal(game.get('d4'),undefined);assert.equal(game.get('e4').type,'p');
-    assert.equal(game.turn(),turn);assert.equal(branch.color,turn);assert.equal(branch.parentId,'original');assert.equal(branch.retrying,true);assert.equal(branch.opponent,1500);assert.deepEqual(branch.moves,[]);
+    assert.equal(game.turn(),turn);assert.equal(branch.color,record.color);assert.equal(branch.parentId,'original');assert.equal(branch.retrying,true);assert.equal(branch.opponent,1500);assert.deepEqual(branch.moves,[]);
   }
   assert.deepEqual(record,before);
 });

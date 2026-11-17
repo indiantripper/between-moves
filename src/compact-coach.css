@@ -121,3 +121,13 @@
 }
 
 @media(max-width:360px){.playback-coachmark>span{font-size:11px}}
+/* Rearranging pieces needs only whose turn is next and the existing play control. */
+.editing-position>.timeline{display:flex!important;justify-content:flex-start}
+.editing-position .timeline-buttons,.editing-position #history-position,.editing-position #mobile-best-move,.editing-position .coaching-switch{display:none!important}
+.editing-position .board-shell{outline:none}
+.side-to-play:not([hidden]){display:flex;align-items:center;gap:9px;margin-right:3px}
+.side-to-play>span{font-size:12px;color:#65745f;white-space:nowrap}
+.side-to-play>div{display:flex;padding:3px;border:1px solid #dce4d4;border-radius:9px;background:#f3f5ed;gap:2px}
+.side-to-play button{border:0;background:transparent;color:#65745f;font:inherit;font-size:13px;min-height:32px;padding:5px 12px;border-radius:6px;cursor:pointer}
+.side-to-play button[aria-pressed="true"]{background:#27523f;color:#fffaf0}
+.position-editor-error:not([hidden]){font-size:13px;line-height:1.5;color:#a34a36;background:#fff3ed;padding:8px 10px;margin:0 0 9px;border-radius:7px}

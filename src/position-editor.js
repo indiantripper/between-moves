@@ -22,5 +22,5 @@ export function resumePositionFen(fen,turn) {
 }
 export function editedSession(record,fen,turn,id,created=new Date().toISOString()) {
   const startFen=resumePositionFen(fen,turn);
-  return {id,created,parentId:record.id,editedPosition:true,startFen,mode:record.mode,coachingIntensity:record.coachingIntensity,color:turn,opening:'custom',level:record.level||1350,opponent:record.opponent,assess:false,coach:record.coach??true,moves:[],attempts:[],finished:false,retrying:true};
+  return {id,created,parentId:record.id,editedPosition:true,startFen,mode:record.mode,coachingIntensity:record.coachingIntensity,color:record.color,opening:'custom',level:record.level||1350,opponent:record.opponent,assess:false,coach:record.coach??true,moves:[],attempts:[],finished:false,retrying:true};
 }
